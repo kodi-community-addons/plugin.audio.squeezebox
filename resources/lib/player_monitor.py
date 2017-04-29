@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 '''
-    script.skin.helper.service
-    kodi_monitor.py
-    monitor all kodi events
+    service.squeezelite
+    Squeezelite Player for Kodi
+    player_monitor.py
+    monitor both LMS and Kodi player
 '''
 
 from utils import log_msg, log_exception, ADDON_ID
@@ -152,9 +153,12 @@ class KodiPlayer(xbmc.Player):
                         self.stop()
                         self.playlist.clear()
                     self.trackchanging = False
-                elif "jump" in event or "newsong" in event:
+                elif "jump" in event:
+                    self.trackchanging = True
+                elif "newsong" in event:
                     self.trackchanging = True
                     self.create_playlist()
+                    self.trackchanging = False
                 elif "seek" in event:
                     self.do_seek()
                 elif "pause 1" in event and not xbmc.getCondVisibility("Player.Paused"):

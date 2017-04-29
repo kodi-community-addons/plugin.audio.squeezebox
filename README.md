@@ -1,11 +1,10 @@
-# script.skin.helper.service
-a helper service for Kodi skins
+# service.squeezelite
+Squeezelite player for Kodi
 
 ________________________________________________________________________________________________________
 
 
-All documentation for this addon can be found in the online wiki:
+Work in progress!
+This project is not yet finished altough some basics should already work.
 
-https://github.com/marcelveldt/script.skin.helper.service/wiki
-
-
+Includes squeezelite binary for both Windows and MacOS, for other platforms squeezelite (or other sw player) should be started manually before launching the addon.

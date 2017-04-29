@@ -24,6 +24,7 @@ class MainService:
 
     kodimonitor = None
     kodiplayer = None
+    sl_exec = None
 
     def __init__(self):
         self.win = xbmcgui.Window(10000)
@@ -39,40 +40,44 @@ class MainService:
         playerid = get_mac()
 
         # discover server
-        servers = LMSDiscovery().all()
-        if servers:
-            server = servers[0]
-            log_msg("LMS server discovered - host: %s - port: %s" % (server.get("host"), server.get("port")))
-        else:
-            log_msg("No LMS Server could be detected on the network - abort service startup")
-            return
-
-        # initialize lms server object
-        lmsserver = LMSServer(server.get("host"), server.get("port"))
+        lmsserver = None
+        while not lmsserver and not self.kodimonitor.abortRequested():
+            log_msg("Waiting for LMS Server...")
+            servers = LMSDiscovery().all()
+            if servers:
+                server = servers[0]
+                lmsserver = LMSServer(server.get("host"), server.get("port"))
+                log_msg("LMS server discovered - host: %s - port: %s" % (server.get("host"), server.get("port")))
+            else:
+                self.kodimonitor.waitForAbort(1)
+                
+        # publish lmsdetails as window properties for the plugin entry
+        self.win.setProperty("lmsserver", "%s:%s" %(server.get("host"), server.get("port")))
+        self.win.setProperty("lmsplayer", playerid)
 
         # start squeezelite executable
-        sl_exec = self.start_squeezelite(lmsserver, playerid)
+        self.start_squeezelite(lmsserver, playerid)
 
         # initialize kodi player monitor
-        if playerid and lmsserver:
-            self.kodiplayer = KodiPlayer(win=self.win, playerid=playerid, lmsserver=lmsserver, webport=webport)
-        else:
-            log_msg("LMS Player could not be initialized - abort service startup")
+        self.kodiplayer = KodiPlayer(win=self.win, playerid=playerid, lmsserver=lmsserver, webport=webport)
 
         # keep the threads alive
         while not self.kodimonitor.abortRequested():
-
-            # monitor player status on/off
-            if self.kodiplayer.initialized:
-                # make sure that the player is still alive
-                if not self.kodiplayer.lmsplayer:
-                    self.kodiplayer.lmsplayer = self.kodiplayer.get_lmsplayer()
-                    
-                if self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "stop" and xbmc.getInfoLabel(
-                        "MusicPlayer.getProperty(sl_path)"):
-                    self.kodiplayer.stop()
-                elif not self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "play":
-                    self.kodiplayer.create_playlist()
+            
+            try:
+                # monitor player status on/off
+                if self.kodiplayer.initialized:
+                    # make sure that the player is still alive
+                    if not self.kodiplayer.lmsplayer:
+                        self.kodiplayer.lmsplayer = self.kodiplayer.get_lmsplayer()
+                        
+                    if self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "stop" and xbmc.getInfoLabel(
+                            "MusicPlayer.getProperty(sl_path)"):
+                        self.kodiplayer.stop()
+                    elif not self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "play":
+                        self.kodiplayer.create_playlist()
+            except Exception as exc:
+                log_exception(__name__, exc)
 
             # TODO: check if LMS server is still alive
 
@@ -84,8 +89,7 @@ class MainService:
         self.kodiplayer.exit = True
 
         # stop the extra threads
-        if sl_exec:
-            sl_exec.terminate()
+        self.stop_squeezelite()
         proxy_runner.stop()
         proxy_runner = None
 
@@ -94,6 +98,13 @@ class MainService:
 
     def start_squeezelite(self, lmsserver, playerid):
         '''On supported platforms (to be extended) we include squeezelite binary'''
+        # safety check: make sure there isn't another squeezelite client running...
+        for item in lmsserver.get_players():
+            if playerid in item.ref:
+                log_msg("another instance of squeezelite is already running on this machine...")
+                self.sl_exec = False
+                return
+        
         sl_exec = None
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
         proc = self.get_squeezelite_binary()
@@ -105,14 +116,19 @@ class MainService:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
             try:
-                sl_exec = subprocess.Popen(args, startupinfo=startupinfo)
+                self.sl_exec = subprocess.Popen(args, startupinfo=startupinfo)
             except Exception as exc:
                 log_exception(__name__, exc)
-        if not sl_exec:
+        if not self.sl_exec:
             log_msg("The Squeezelite binary was not automatically started, "
                     "you should make sure of starting it yourself, e.g. as a service.")
-        return sl_exec
+            self.sl_exec = False
 
+    def stop_squeezelite(self):
+        '''stop squeezelite if supported'''
+        if self.sl_exec and not isinstance(self.sl_exec, bool):
+            self.sl_exec.terminate()
+            
     @staticmethod
     def get_squeezelite_binary():
         '''find the correct squeezelite binary belonging to the platform'''
