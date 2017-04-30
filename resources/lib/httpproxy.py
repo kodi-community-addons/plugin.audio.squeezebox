@@ -14,6 +14,7 @@ import platform
 import logging
 import os
 from utils import log_msg
+import xbmc
 
 
 class HTTPProxyError(Exception):
@@ -125,6 +126,12 @@ class Track:
         # Error if the requester is not allowed
         if headers['Remote-Addr'] not in self.__allowed_ips:
             raise cherrypy.HTTPError(403)
+            
+        # for now we do not accept range requests
+        # todo: implement range requests so seek works
+        if headers.get('Range','') and headers.get('Range','') != "bytes=0-":
+            xbmc.executebuiltin("SetProperty(sb-seekworkaround, true, Home)")
+            raise cherrypy.HTTPError(416)
 
         return method
 

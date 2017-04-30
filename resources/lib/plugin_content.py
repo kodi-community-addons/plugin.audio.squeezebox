@@ -411,8 +411,9 @@ class PluginContent:
                         cmd = "command&params=%s" %quote_plus(actionstr)
                     thumb = self.get_thumb(item)
                     self.create_generic_listitem(item["text"], thumb, cmd, is_folder)
-            elif not item.get("hasitems") and item.get("isaudio"):
+            elif item.get("isaudio") and not itemtype == "playlist":
                 # playable item
+                log_msg(item)
                 cmd = "%s playlist play item_id:%s" % (app, item["id"])
                 cmd = "command&params=%s" % quote_plus(cmd)
                 self.create_generic_listitem(item["name"], thumb, cmd, False)
@@ -516,11 +517,13 @@ class PluginContent:
                              'artist': lms_item.get("artist"),
                              'rating': lms_item.get("rating"),
                              'genre': lms_item.get("genre"),
-                             'year': lms_item.get("year")
+                             'year': lms_item.get("year"),
+                             'mediatype': lms_item.get("artist")
                          })
         listitem.setArt({"thumb": thumb})
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
+        listitem.setProperty("DBYPE", "song")
         url = "plugin://plugin.audio.squeezebox?action=albums&params=artist_id:%s" % lms_item.get("id")
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=True)
@@ -549,9 +552,10 @@ class PluginContent:
                              'rating': lms_item.get("rating"),
                              'genre': lms_item.get("genre"),
                              'year': lms_item.get("year"),
-                             'dbtype': 'album'
+                             'mediatype': 'album'
                          })
         listitem.setArt({"thumb": thumb})
+        listitem.setProperty("DBYPE", "album")
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
         url = "plugin://plugin.audio.squeezebox?action=tracks&params=album_id:%s" % lms_item.get("id")
@@ -573,12 +577,14 @@ class PluginContent:
                              'genre': "/".join(lms_item.get("genres").split(", ")),
                              'tracknumber': lms_item.get("track_number"),
                              'lyrics': lms_item.get("lyrics"),
-                             'year': lms_item.get("year")
+                             'year': lms_item.get("year"),
+                             'mediatype': lms_item.get("song")
                          })
         listitem.setArt({"thumb": thumb})
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
         listitem.setProperty("isPlayable", "false")
+        listitem.setProperty("DBYPE", "song")
         cmd = quote_plus("playlist play %s" % lms_item.get("url"))
         url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),

@@ -5,7 +5,7 @@
     plugin.audio.squeezebox
     Squeezelite Player for Kodi
     main_service.py
-    Background service running the various threads
+    Background service which launches the squeezelite binary and monitors the player
 '''
 
 from utils import log_msg, ADDON_ID, log_exception, get_mac
@@ -98,14 +98,7 @@ class MainService:
         self.close()
 
     def start_squeezelite(self, lmsserver, playerid):
-        '''On supported platforms (to be extended) we include squeezelite binary'''
-        # safety check: make sure there isn't another squeezelite client running...
-        for item in lmsserver.get_players():
-            if playerid in item.ref:
-                log_msg("another instance of squeezelite is already with this MAC-address - abort squeezelite startup...")
-                self.sl_exec = False
-                return
-
+        '''On supported platforms we include squeezelite binary'''
         sl_exec = None
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
         proc = self.get_squeezelite_binary()

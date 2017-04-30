@@ -59,8 +59,14 @@ class KodiPlayer(xbmc.Player):
         if self.initialized and self.isPlayingAudio() and self.lmsplayer.mode == "play" and xbmc.getInfoLabel("MusicPlayer.getProperty(sl_path)"):
             if xbmc.getInfoLabel("MusicPlayer.Title").decode("utf-8") != self.lmsplayer.track_title:
                 # the user requested a different song by using kodi controls
-                log_msg("NEXT TRACK REQUESTED")
-                self.lmsplayer.next()
+                if xbmc.getInfoLabel("Window(Home).Property(sb-seekworkaround)"):
+                    # ignore...(workaround)
+                    xbmc.executebuiltin("ClearProperty(sb-seekworkaround,Home)")
+                    self.create_playlist()
+                    log_msg("seek request ignored...")
+                else:
+                    log_msg("NEXT TRACK REQUESTED")
+                    self.lmsplayer.next()
 
     def onPlayBackSpeedChanged(self, speed):
         '''Kodi event fired when player is fast forwarding/rewinding'''
@@ -105,6 +111,8 @@ class KodiPlayer(xbmc.Player):
             duration_str = "%s" % int(lms_song.get("duration"))
         file_name = "http://127.0.0.1:%s/track/%s.wav" % (self.webport, duration_str)
         listitem.setProperty("sl_path", file_name)
+        listitem.setContentLookup(False)
+        listitem.setProperty('do_not_analyze', 'true')
         return listitem, file_name
 
     def create_playlist(self, skipplay=False):
