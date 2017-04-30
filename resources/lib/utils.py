@@ -31,7 +31,7 @@ def log_msg(msg, loglevel=xbmc.LOGNOTICE):
     '''log message to kodi log'''
     if isinstance(msg, unicode):
         msg = msg.encode('utf-8')
-    xbmc.log("Squeezelite Service --> %s" % msg, level=loglevel)
+    xbmc.log("%s --> %s" % (ADDON_ID, msg), level=loglevel)
 
 
 def log_exception(modulename, exceptiondetails):
@@ -42,7 +42,6 @@ def log_exception(modulename, exceptiondetails):
 
 def get_json(url, params):
     '''get info from json api'''
-    log_msg("get json - url: %s  - params: %s" % (url, params))
     result = {}
     try:
         response = requests.get(url, data=json.dumps(params), timeout=20)
@@ -63,7 +62,7 @@ def get_mac():
     '''helper to obtain the mac address of the kodi machine'''
     count = 0
     mac = ""
-    while (not mac or "busy" in mac) and count < 100:
+    while ":" not in mac and count < 100:
         log_msg("Waiting for mac address...")
         mac = xbmc.getInfoLabel("Network.MacAddress").lower()
         count += 1
