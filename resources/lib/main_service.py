@@ -17,6 +17,7 @@ import xbmcgui
 from LMSTools import LMSServer, LMSDiscovery
 import subprocess
 import os
+import sys
 
 
 class MainService:
@@ -50,9 +51,9 @@ class MainService:
                 log_msg("LMS server discovered - host: %s - port: %s" % (server.get("host"), server.get("port")))
             else:
                 self.kodimonitor.waitForAbort(1)
-                
+
         # publish lmsdetails as window properties for the plugin entry
-        self.win.setProperty("lmsserver", "%s:%s" %(server.get("host"), server.get("port")))
+        self.win.setProperty("lmsserver", "%s:%s" % (server.get("host"), server.get("port")))
         self.win.setProperty("lmsplayer", playerid)
 
         # start squeezelite executable
@@ -63,14 +64,14 @@ class MainService:
 
         # keep the threads alive
         while not self.kodimonitor.abortRequested():
-            
+
             try:
                 # monitor player status on/off
                 if self.kodiplayer.initialized:
                     # make sure that the player is still alive
                     if not self.kodiplayer.lmsplayer:
                         self.kodiplayer.lmsplayer = self.kodiplayer.get_lmsplayer()
-                        
+
                     if self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "stop" and xbmc.getInfoLabel(
                             "MusicPlayer.getProperty(sl_path)"):
                         self.kodiplayer.stop()
@@ -101,10 +102,10 @@ class MainService:
         # safety check: make sure there isn't another squeezelite client running...
         for item in lmsserver.get_players():
             if playerid in item.ref:
-                log_msg("another instance of squeezelite is already running on this machine...")
+                log_msg("another instance of squeezelite is already with this MAC-address - abort squeezelite startup...")
                 self.sl_exec = False
                 return
-        
+
         sl_exec = None
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
         proc = self.get_squeezelite_binary()
@@ -128,16 +129,24 @@ class MainService:
         '''stop squeezelite if supported'''
         if self.sl_exec and not isinstance(self.sl_exec, bool):
             self.sl_exec.terminate()
-            
+
     @staticmethod
     def get_squeezelite_binary():
         '''find the correct squeezelite binary belonging to the platform'''
-        # todo: extend with linux support and/or possibility to manual specify the path
         sl_binary = ""
         if xbmc.getCondVisibility("System.Platform.Windows"):
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "win32", "squeezelite-win.exe")
         elif xbmc.getCondVisibility("System.Platform.OSX"):
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "osx", "squeezelite")
+        elif xbmc.getCondVisibility("System.Platform.Linux.RaspberryPi"):
+            sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-arm")
+        elif xbmc.getCondVisibility("System.Platform.Linux"):
+            if sys.maxsize > 2**32:
+                sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-i64")
+            else:
+                sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-x86")
+        else:
+            log_msg("Unsupported platform! - for iOS and Android you need to install a squeezeplayer app yourself and mure sure it's running in the background.")
         return sl_binary
 
     def close(self):

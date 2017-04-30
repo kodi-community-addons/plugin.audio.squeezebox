@@ -49,7 +49,7 @@ class PluginContent:
         # initialize plugin listing
         try:
             self.params = dict(urlparse.parse_qsl(sys.argv[2].replace('?', '').decode("utf-8")))
-            log_msg("plugin called with parameters: %s" % self.params)
+            log_msg("plugin called with parameters: %s" % self.params, xbmc.LOGDEBUG)
             self.main()
         except Exception as exc:
             log_exception(__name__, exc)
@@ -137,7 +137,6 @@ class PluginContent:
         result = self.send_request(request_str)
         if result:
             for item in result.get("playlists_loop"):
-                log_msg(item)
                 cmd = "playlisttracks&playlistid=%s" % item["id"]
                 self.create_generic_listitem(item["playlist"], "DefaultMusicPlaylists.png", cmd)
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
@@ -204,7 +203,6 @@ class PluginContent:
         result = self.send_request(request_str)
         if result:
             for item in result.get("loop_loop"):
-                log_msg(item)
                 thumb = self.get_thumb(item)
                 if not thumb and item["isaudio"] and "url" in item:
                     track_details = self.get_songinfo(item["url"])
@@ -289,7 +287,6 @@ class PluginContent:
         node = self.params.get("node", "home")
         for item in self.get_menu(node):
             thumb = self.get_thumb(item)
-            log_msg(item)
             self.create_generic_listitem(item["label"], thumb, item["cmd"])
         # show sync settings in menu
         if node == "home":
@@ -332,7 +329,6 @@ class PluginContent:
             searchterm = kb.getText().replace(" ","[SP]")
             result = self.send_request("globalsearch items 0 10 search:%s" %searchterm)
             for item in result["loop_loop"]:
-                log_msg(item)
                 params = "globalsearch items 0 100 item_id:%s" %item["id"]
                 cmd = "browse&params=%s" % quote_plus(params)
                 self.create_generic_listitem(item["name"], "DefaultMusicSearch.png", cmd)
@@ -348,7 +344,6 @@ class PluginContent:
         result = self.send_request("appgallery items 0 100000")
         if result:
             for item in result["loop_loop"]:
-                log_msg(item)
                 thumb = self.get_thumb(item)
                 if "id" in item:
                     item_id = item["id"]
@@ -598,13 +593,12 @@ class PluginContent:
     def command(self):
         '''play item'''
         cmd = self.params.get("params")
-        log_msg(cmd)
         self.send_request(cmd)
         xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=True, listitem=xbmcgui.ListItem())
 
     def send_request(self, cmd):
         '''send request to lms server'''
-        log_msg(cmd)
+        log_msg(cmd, xbmc.LOGDEBUG)
         if isinstance(cmd, (str, unicode)):
             if "[SP]" in cmd:
                 new_cmd = []
@@ -617,5 +611,5 @@ class PluginContent:
         cmd = [self.playerid, cmd]
         params = {"id": 1, "method": "slim.request", "params": cmd}
         result = get_json(url, params)
-        log_msg(result)
+        log_msg(result, xbmc.LOGDEBUG)
         return result
