@@ -87,6 +87,7 @@ class MainService:
 
         # Abort was requested while waiting. We should exit
         log_msg('Shutdown requested !', xbmc.LOGNOTICE)
+        self.win.setProperty("lmsexit", "true")
         self.kodiplayer.exit = True
 
         # stop the extra threads
@@ -99,7 +100,6 @@ class MainService:
 
     def start_squeezelite(self, lmsserver, playerid):
         '''On supported platforms we include squeezelite binary'''
-        sl_exec = None
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
         proc = self.get_squeezelite_binary()
         if proc:
@@ -120,7 +120,7 @@ class MainService:
 
     def stop_squeezelite(self):
         '''stop squeezelite if supported'''
-        if self.sl_exec and not isinstance(self.sl_exec, bool):
+        if self.sl_exec:
             self.sl_exec.terminate()
 
     @staticmethod

@@ -12,13 +12,14 @@ import xbmc
 import xbmcplugin
 import xbmcgui
 import xbmcaddon
-from utils import log_msg, KODI_VERSION, log_exception, get_json
+from utils import log_msg, KODI_VERSION, log_exception, get_json, ADDON_ID
 import urlparse
 from urllib import quote_plus
 import sys
 import os
 from operator import itemgetter
 
+PLUGIN_BASE = "plugin://%s/" % ADDON_ID
 
 class PluginContent:
     '''Hidden plugin entry point providing some helper features'''
@@ -33,7 +34,7 @@ class PluginContent:
         try:
             playerid = self.win.getProperty("lmsplayer").decode("utf-8")
             serverdetails = self.win.getProperty("lmsserver").decode("utf-8")
-            while not serverdetails:
+            while not serverdetails and not xbmc.getInfoLabel("Window(Home).Property(lmsexit)"):
                 playerid = self.win.getProperty("lmsplayer").decode("utf-8")
                 serverdetails = self.win.getProperty("lmsserver").decode("utf-8")
                 xbmc.sleep(500)
@@ -411,12 +412,24 @@ class PluginContent:
                         cmd = "command&params=%s" %quote_plus(actionstr)
                     thumb = self.get_thumb(item)
                     self.create_generic_listitem(item["text"], thumb, cmd, is_folder)
-            elif item.get("isaudio") and not itemtype == "playlist":
+            elif item.get("isaudio"):
                 # playable item
-                log_msg(item)
-                cmd = "%s playlist play item_id:%s" % (app, item["id"])
+                contextmenu = []
+                params = quote_plus("%s playlist play item_id:%s" %(app, item["id"]))
+                contextmenu.append(( "Play now","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+                params = quote_plus("%s playlist insert item_id:%s" %(app, item["id"]))
+                contextmenu.append(( "Play next","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+                params = quote_plus("%s playlist add item_id:%s" %(app, item["id"]))
+                contextmenu.append(( "Insert at end","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+               
+                if itemtype == "playlist":
+                    params = quote_plus("%s items 0 100000 item_id:%s" %(app, item["id"]))
+                    contextmenu.append(( "Browse","Container.Update(%s?action=browse&params=%s)"%(PLUGIN_BASE,params) ))
+                    cmd = "%s playlist play item_id:%s" % (app, item["id"])
+                else:
+                    cmd = "%s playlist add item_id:%s" % (app, item["id"])
                 cmd = "command&params=%s" % quote_plus(cmd)
-                self.create_generic_listitem(item["name"], thumb, cmd, False)
+                self.create_generic_listitem(item["name"], thumb, cmd, False, contextmenu)
             else:
                 # folder item
                 contentttype = self.get_app_contenttype(item)
@@ -523,7 +536,10 @@ class PluginContent:
         listitem.setArt({"thumb": thumb})
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
-        listitem.setProperty("DBYPE", "song")
+        listitem.setProperty("DBYPE", "artist")
+        # contextmenu
+        contextmenu = []
+        listitem.addContextMenuItems(contextmenu,True)
         url = "plugin://plugin.audio.squeezebox?action=albums&params=artist_id:%s" % lms_item.get("id")
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=True)
@@ -559,6 +575,15 @@ class PluginContent:
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
         url = "plugin://plugin.audio.squeezebox?action=tracks&params=album_id:%s" % lms_item.get("id")
+        # contextmenu
+        contextmenu = []
+        try:
+            special_char = "*".encode("utf-8")
+            params = quote_plus(u"playlist loadalbum %s %s %s" %(special_char,lms_item["artist"].replace(" ","[SP]"),lms_item["album"].replace(" ","[SP]")))
+            contextmenu.append(( "Play album","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+        except: 
+            pass
+        listitem.addContextMenuItems(contextmenu,True)
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=True)
 
@@ -587,12 +612,25 @@ class PluginContent:
         listitem.setProperty("DBYPE", "song")
         cmd = quote_plus("playlist play %s" % lms_item.get("url"))
         url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
+        # contextmenu
+        contextmenu = []
+        params = quote_plus("playlist play %s" %lms_item["url"])
+        contextmenu.append(( "Play now","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+        params = quote_plus("playlist insert %s" %lms_item["url"])
+        contextmenu.append(( "Play next","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+        params = quote_plus("playlist add %s" %lms_item["url"])
+        contextmenu.append(( "Insert at end","RunPlugin(%s?action=command&params=%s)"%(PLUGIN_BASE,params) ))
+        listitem.addContextMenuItems(contextmenu,True)
+        
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=False)
 
-    def create_generic_listitem(self, label, icon, cmd, is_folder=True):
+    def create_generic_listitem(self, label, icon, cmd, is_folder=True, contextmenu=None):
         listitem = xbmcgui.ListItem(label, iconImage=icon)
         url = "plugin://plugin.audio.squeezebox?action=%s" % cmd
+        if not contextmenu:
+            contextmenu = []
+        listitem.addContextMenuItems(contextmenu,True)
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=is_folder)
 
@@ -604,7 +642,7 @@ class PluginContent:
 
     def send_request(self, cmd):
         '''send request to lms server'''
-        log_msg(cmd, xbmc.LOGDEBUG)
+        #log_msg(cmd)
         if isinstance(cmd, (str, unicode)):
             if "[SP]" in cmd:
                 new_cmd = []
@@ -617,5 +655,5 @@ class PluginContent:
         cmd = [self.playerid, cmd]
         params = {"id": 1, "method": "slim.request", "params": cmd}
         result = get_json(url, params)
-        log_msg(result, xbmc.LOGDEBUG)
+        #log_msg(result)
         return result
