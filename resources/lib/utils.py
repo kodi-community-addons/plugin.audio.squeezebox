@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    service.squeezelite
+    plugin.audio.squeezebox
     Squeezelite Player for Kodi
     utils.py
     Various helper methods
@@ -20,9 +20,9 @@ try:
     import simplejson as json
 except Exception:
     import json
-    
 
-ADDON_ID = "service.squeezelite"
+
+ADDON_ID = "plugin.audio.squeezebox"
 KODI_VERSION = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
 KODILANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
 
@@ -39,9 +39,10 @@ def log_exception(modulename, exceptiondetails):
     log_msg(format_exc(sys.exc_info()), xbmc.LOGWARNING)
     log_msg("Exception in %s ! --> %s" % (modulename, exceptiondetails), xbmc.LOGERROR)
 
+
 def get_json(url, params):
     '''get info from json api'''
-    log_msg("get json - url: %s  - params: %s" %(url, params))
+    log_msg("get json - url: %s  - params: %s" % (url, params))
     result = {}
     try:
         response = requests.get(url, data=json.dumps(params), timeout=20)
@@ -50,24 +51,12 @@ def get_json(url, params):
             if "result" in result:
                 result = result["result"]
         else:
-            log_msg("Invalid or empty reponse from server - command: %s - server response: %s" %(cmd, response.status_code))
+            log_msg(
+                "Invalid or empty reponse from server - command: %s - server response: %s" %
+                (cmd, response.status_code))
     except Exception as exc:
         log_exception(__name__, exc)
     return result
-    
-def get_json2(url, params):
-    import urllib2
-    req = urllib2.Request(url)
-    req.add_header('Content-Type', 'application/json')
-
-    try:
-        response = urllib2.urlopen(req, json.dumps(params))
-        return json.loads(response.read())["result"]
-
-    except Exception as exc:
-        log_exception(__name__, exc)
-        log_msg("Could not connect to server.")
-        return None
 
 
 def get_mac():
@@ -86,25 +75,3 @@ def get_mac():
     return mac
 
 
-def try_encode(text, encoding="utf-8"):
-    '''helper to encode a string to utf-8'''
-    try:
-        return text.encode(encoding, "ignore")
-    except Exception:
-        return text
-
-
-def try_decode(text, encoding="utf-8"):
-    '''helper to decode a string into unicode'''
-    try:
-        return text.decode(encoding, "ignore")
-    except Exception:
-        return text
-
-
-def urlencode(text):
-    '''urlencode a string'''
-    blah = urllib.urlencode({'blahblahblah': try_encode(text)})
-    blah = blah[13:]
-    return blah
-    

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    service.squeezelite
+    plugin.audio.squeezebox
     Squeezelite Player for Kodi
     main_service.py
     Background service running the various threads

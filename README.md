@@ -1,4 +1,4 @@
-# service.squeezelite
+# plugin.audio.squeezebox
 Squeezelite player for Kodi
 
 ________________________________________________________________________________________________________

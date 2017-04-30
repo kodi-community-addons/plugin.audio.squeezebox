@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    service.squeezelite
+    plugin.audio.squeezebox
     Squeezelite Player for Kodi
     plugin_content.py
     plugin entry point t
@@ -70,21 +70,7 @@ class PluginContent:
             getattr(self, action)()
         else:
             # load main listing
-
-            # root_menu = self.send_request("menu items 0 1000 direct:1")
-            # log_msg(root_menu)
-
-            # self.create_generic_listitem("Artists", "DefaultMusicArtists.png", "artists")
-            # self.create_generic_listitem("Albums", "DefaultMusicAlbums.png", "albums")
-            # self.create_generic_listitem("Playlists", "DefaultMusicPlaylists.png", "playlists")
-            # self.create_generic_listitem("Genres", "DefaultMusicGenres.png", "genres")
-            # self.create_generic_listitem("Favourites", "DefaultFolder.png", "favorites")
-            # self.create_generic_listitem("Apps", "DefaultFolder.png", "apps")
-            
             self.menu()
-            
-
-            #xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
     def albums(self):
         '''get albums from server'''
@@ -295,7 +281,7 @@ class PluginContent:
                         "label": item["text"], 
                         "cmd": actionstr,
                         "icon": icon,
-                        "weight": item["weight"]}
+                        "weight": item.get("weight", 0)}
                     menu_items.append(menu_item)
         return sorted(menu_items, key=itemgetter('weight')) 
         
@@ -305,6 +291,9 @@ class PluginContent:
             thumb = self.get_thumb(item)
             log_msg(item)
             self.create_generic_listitem(item["label"], thumb, item["cmd"])
+        # show sync settings in menu
+        if node == "home":
+            self.create_generic_listitem("Synchroniseren", "", "browse&params=syncsettings 0 100")
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
         
     def search(self):
@@ -403,7 +392,31 @@ class PluginContent:
             thumb = self.get_thumb(item)
             app = request_str.split(" ")[0]
             itemtype = item.get("type", "")
-            if not item["hasitems"] and item["isaudio"]:
+            if "actions" in item:
+                actionstr = ""
+                action_key = "go"
+                is_folder = True
+                if "do" in item["actions"]:
+                    action_key = "do"
+                    is_folder = False
+                if action_key in item["actions"] and "cmd" in item["actions"][action_key]:
+                    for cmd in item["actions"][action_key]["cmd"]:
+                        if cmd == "items":
+                            actionstr += "items 0 100000 "
+                        else:
+                            actionstr += "%s " %cmd
+                if action_key in item["actions"] and "params" in item["actions"][action_key]:
+                    for key, value in item["actions"][action_key]["params"].iteritems():
+                        if not "menu" in key:
+                            actionstr += "%s:%s " %(key, value)
+                if actionstr:
+                    if is_folder:
+                        cmd = "browse&params=%s" %quote_plus(actionstr)
+                    else:
+                        cmd = "command&params=%s" %quote_plus(actionstr)
+                    thumb = self.get_thumb(item)
+                    self.create_generic_listitem(item["text"], thumb, cmd, is_folder)
+            elif not item.get("hasitems") and item.get("isaudio"):
                 # playable item
                 cmd = "%s playlist play item_id:%s" % (app, item["id"])
                 cmd = "command&params=%s" % quote_plus(cmd)
@@ -416,8 +429,13 @@ class PluginContent:
                     params = "%s items 0 10000" %app
                 elif itemtype == "search":
                     params = quote_plus("%s items 0 100000 search:__TAGGEDINPUT__" %app)
-                else:
+                elif "id" in item:
+                    # subnode for app/radio
                     params = quote_plus("%s items 0 100000 item_id:%s" %(app, item["id"]))
+                elif "text" in item:
+                    # text node without any actions ?
+                    self.create_generic_listitem(item["text"], thumb, "browse&params=%s" %request_str)
+                    continue
                 cmd = "browse&params=%s&contentttype=%s" % (params, contentttype)
                 self.create_generic_listitem(item["name"], thumb, cmd)
 
@@ -508,7 +526,7 @@ class PluginContent:
         listitem.setArt({"thumb": thumb})
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
-        url = "plugin://service.squeezelite?action=albums&params=artist_id:%s" % lms_item.get("id")
+        url = "plugin://plugin.audio.squeezebox?action=albums&params=artist_id:%s" % lms_item.get("id")
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=True)
 
@@ -541,7 +559,7 @@ class PluginContent:
         listitem.setArt({"thumb": thumb})
         listitem.setIconImage(thumb)
         listitem.setThumbnailImage(thumb)
-        url = "plugin://service.squeezelite?action=tracks&params=album_id:%s" % lms_item.get("id")
+        url = "plugin://plugin.audio.squeezebox?action=tracks&params=album_id:%s" % lms_item.get("id")
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=True)
 
@@ -567,13 +585,13 @@ class PluginContent:
         listitem.setThumbnailImage(thumb)
         listitem.setProperty("isPlayable", "false")
         cmd = quote_plus("playlist play %s" % lms_item.get("url"))
-        url = "plugin://service.squeezelite?action=command&params=%s" % cmd
+        url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=False)
 
     def create_generic_listitem(self, label, icon, cmd, is_folder=True):
         listitem = xbmcgui.ListItem(label, iconImage=icon)
-        url = "plugin://service.squeezelite?action=%s" % cmd
+        url = "plugin://plugin.audio.squeezebox?action=%s" % cmd
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=is_folder)
 

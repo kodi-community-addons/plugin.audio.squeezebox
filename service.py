@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    service.squeezelite
+    plugin.audio.squeezebox
     Squeezelite Player for Kodi
     Main service entry point
 '''
