@@ -101,12 +101,12 @@ class KodiPlayer(xbmc.Player):
         '''Create Kodi listitem from LMS song details'''
         thumb = self.lmsserver.get_thumb(lms_song)
         listitem = xbmcgui.ListItem('Squeezelite')
-        artists = "/".join(lms_song.get("trackartist", "").split(", "))
+        artists = " / ".join(lms_song.get("trackartist", "").split(", "))
         if not artists:
-            artists = "/".join(lms_song.get("artist", "").split(", "))
-        genres = "/".join(lms_song.get("genres", "").split(", "))
+            artists = " / ".join(lms_song.get("artist", "").split(", "))
+        genres = " / ".join(lms_song.get("genres", "").split(", "))
         if not genres:
-            genres = "/".join(lms_song.get("genre", "").split(", "))
+            genres = " / ".join(lms_song.get("genre", "").split(", "))
 
         listitem.setInfo('music',
                          {

@@ -18,7 +18,7 @@ from urllib import quote_plus
 import sys
 import os
 from operator import itemgetter
-from lmsserver import LMSServer
+from lmsserver import LMSServer, FULLTAGS
 
 PLUGIN_BASE = "plugin://%s/" % ADDON_ID
 
@@ -54,8 +54,6 @@ class PluginContent:
 
         # cleanup when done processing
         del win
-        if self.lmsserver:
-            self.lmsserver.close()
 
     def main(self):
         '''main action, load correct function'''
@@ -71,7 +69,7 @@ class PluginContent:
         '''get albums from server'''
         params = self.params.get("params")
         xbmcplugin.setContent(int(sys.argv[1]), "albums")
-        request_str = "albums 0 100000 tags:guxcyajlKR"
+        request_str = "albums 0 100000 tags:%s" % FULLTAGS
         if params:
             request_str += " %s" % params
             if "artist_id" in params:
@@ -86,7 +84,7 @@ class PluginContent:
         '''get artists from server'''
         params = self.params.get("params")
         xbmcplugin.setContent(int(sys.argv[1]), "artists")
-        request_str = "artists 0 100000 tags:guxcyajlKR"
+        request_str = "artists 0 100000 tags:%s" % FULLTAGS
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -102,7 +100,7 @@ class PluginContent:
         if "sql" in params:
             request_str = "tracks 0 100000 tags:dguxcyajlKAG"  # somehow the request fails if the rating tag is requested
         else:
-            request_str = "tracks 0 100000 tags:dguxcyajlKRAG"
+            request_str = "tracks 0 100000 tags:%s" % FULLTAGS
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -115,7 +113,7 @@ class PluginContent:
         '''get tracks from server'''
         playlistid = self.params.get("playlistid")
         xbmcplugin.setContent(int(sys.argv[1]), "songs")
-        request_str = "playlists tracks 0 100000 tags:dguxcyajlKRAG playlist_id:%s" % playlistid
+        request_str = "playlists tracks 0 100000 tags:%s playlist_id:%s" % (FULLTAGS, playlistid)
         result = self.lmsserver.send_request(request_str)
         if result:
             for item in result.get("playlisttracks_loop"):
