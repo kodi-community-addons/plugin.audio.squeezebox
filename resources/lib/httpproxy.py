@@ -34,7 +34,7 @@ class Track:
     def _get_wave_header(self, duration):
         '''generate a wave header for our silence stream'''
         file = StringIO.StringIO()
-        
+
         # always add 10 seconds of additional duration to solve crossfade issues
         duration += 10
         numsamples = 44100 * duration
@@ -87,7 +87,47 @@ class Track:
 
         return file.getvalue(), all_cunks_size + 8
 
-    def _write_file_content(self, filesize, wave_header=None, max_buffer_size=65535):
+    def get_silence_mp3(self):
+        with open(os.path.join(os.path.dirname(__file__), "Silent.mp3"), "rb") as f:
+            while True:
+                data = f.read(128)
+                if data:
+                    for b in data:
+                        yield b
+                else:
+                    break
+
+    def send_radio_stream(self, max_buffer_size=65535):
+
+        # Initialize some loop vars
+        output_buffer = StringIO.StringIO()
+        bytes_written = 0
+        has_frames = True
+
+        filesize = 1024000
+
+        # Get bytes from our silenced mp3 file and loop untill we reach the end
+        while bytes_written < filesize and xbmc.getCondVisibility("IsEmpty(Window(Home).Property(lmsexit))"):
+            for frame in self.get_silence_mp3():
+
+                # Check if this frame fits in the estimated calculation
+                if bytes_written + len(frame) < filesize:
+                    output_buffer.write(frame)
+                    bytes_written += len(frame)
+
+                # Does not fit, we need to truncate the frame data
+                else:
+                    truncate_size = filesize - bytes_written
+                    output_buffer.write(frame[:truncate_size])
+                    bytes_written = filesize
+                    has_frames = False
+
+                # Check if the current buffer needs to be flushed
+                if not has_frames or output_buffer.tell() > max_buffer_size:
+                    yield output_buffer.getvalue()
+                    output_buffer.truncate(0)
+
+    def send_audio_stream(self, filesize, wave_header=None, max_buffer_size=65535):
 
         # Initialize some loop vars
         output_buffer = StringIO.StringIO()
@@ -100,7 +140,7 @@ class Track:
             bytes_written = output_buffer.tell()
             yield wave_header
             output_buffer.truncate(0)
-        
+
         # this is where we would normally stream packets from an audio input
         # In this case we stream only silence until the end is reached
         while bytes_written < filesize:
@@ -126,19 +166,8 @@ class Track:
         # Error if the requester is not allowed
         if headers['Remote-Addr'] not in self.__allowed_ips:
             raise cherrypy.HTTPError(403)
-            
-        # for now we do not accept range requests
-        # todo: implement range requests so seek works
-        if headers.get('Range','') and headers.get('Range','') != "bytes=0-":
-            xbmc.executebuiltin("SetProperty(sb-seekworkaround, true, Home)")
-            raise cherrypy.HTTPError(416)
 
         return method
-
-    def _write_http_headers(self, filesize):
-        cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
-        cherrypy.response.headers['Content-Length'] = filesize
-        cherrypy.response.headers['Accept-Ranges'] = 'none'
 
     @cherrypy.expose
     def default(self, track_id, **kwargs):
@@ -146,21 +175,53 @@ class Track:
         self._check_request()
 
         # get duration from track id
-        track_id = track_id.split(".")[0]
-        duration = 60
+        is_radio = False
         try:
             duration = int(track_id)
         except:
-            pass
+            is_radio = True
+            duration = 60
 
         # Calculate file size, and obtain the header
-        file_header, filesize = self._get_wave_header(duration)
+        if not is_radio:
+            file_header, filesize = self._get_wave_header(duration)
 
-        self._write_http_headers(filesize)
+        # headers
+        if is_radio:
+            cherrypy.response.headers['Content-Type'] = 'audio/mp3'
+            cherrypy.response.headers['Connection'] = 'chunked'
+        elif cherrypy.request.headers.get('Range', '') == "bytes=0-":
+            cherrypy.response.status = '206 Partial Content'
+            cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
+            cherrypy.response.headers['Accept-Ranges'] = 'bytes'
+            cherrypy.response.headers['Content-Length'] = filesize
+            cherrypy.response.headers['Content-Range'] = "bytes 0-%s/%s" % (filesize, filesize)
+        elif cherrypy.request.headers.get('Range'):
+            # partial request
+            cherrypy.response.status = '206 Partial Content'
+            cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
+            range = cherrypy.request.headers["Range"].split("bytes=")[1].split("-")
+            range_l = int(range[0])
+            try:
+                range_r = int(range[1])
+            except:
+                range_r = filesize
+            chunk = range_r - range_l
+            cherrypy.response.headers['Accept-Ranges'] = 'bytes'
+            cherrypy.response.headers['Content-Length'] = chunk
+            cherrypy.response.headers['Content-Range'] = "bytes %s-%s/%s" % (range_l, range_r, filesize)
+            filesize = chunk
+        else:
+            cherrypy.response.status = '200 OK'
+            cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
+            cherrypy.response.headers['Content-Length'] = filesize
 
         # If method was GET, write the file content
         if cherrypy.request.method.upper() == 'GET':
-            return self._write_file_content(filesize, file_header)
+            if is_radio:
+                return self.send_radio_stream()
+            else:
+                return self.send_audio_stream(filesize, file_header)
 
     default._cp_config = {'response.stream': True}
 
@@ -207,7 +268,7 @@ class ProxyRunner(threading.Thread):
         log = cherrypy.log
         log.access_file = ''
         log.error_file = ''
-        log.screen = False
+        log.screen = True
 
         self.__server = wsgiserver.CherryPyWSGIServer((host, port), app)
         threading.Thread.__init__(self)

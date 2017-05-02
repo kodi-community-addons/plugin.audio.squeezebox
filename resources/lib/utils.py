@@ -40,29 +40,11 @@ def log_exception(modulename, exceptiondetails):
     log_msg("Exception in %s ! --> %s" % (modulename, exceptiondetails), xbmc.LOGERROR)
 
 
-def get_json(url, params):
-    '''get info from json api'''
-    result = {}
-    try:
-        response = requests.get(url, data=json.dumps(params), timeout=20)
-        if response and response.content and response.status_code == 200:
-            result = json.loads(response.content.decode('utf-8', 'replace'))
-            if "result" in result:
-                result = result["result"]
-        else:
-            log_msg(
-                "Invalid or empty reponse from server - command: %s - server response: %s" %
-                (cmd, response.status_code))
-    except Exception as exc:
-        log_exception(__name__, exc)
-    return result
-
-
 def get_mac():
     '''helper to obtain the mac address of the kodi machine'''
     count = 0
     mac = ""
-    while ":" not in mac and count < 100:
+    while ":" not in mac and count < 360:
         log_msg("Waiting for mac address...")
         mac = xbmc.getInfoLabel("Network.MacAddress").lower()
         count += 1
@@ -72,5 +54,3 @@ def get_mac():
     else:
         log_msg("Detected Mac-Address: %s" % mac)
     return mac
-
-

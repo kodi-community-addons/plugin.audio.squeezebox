@@ -11,25 +11,24 @@
 from utils import log_msg, ADDON_ID, log_exception, get_mac
 from player_monitor import KodiPlayer
 from httpproxy import ProxyRunner
+from discovery import LMSDiscovery
+from lmsserver import LMSServer
 import xbmc
 import xbmcaddon
 import xbmcgui
-from LMSTools import LMSServer, LMSDiscovery
 import subprocess
 import os
 import sys
+from shoutserver import ShoutServer
 
 
 class MainService:
     '''our main background service running the various threads'''
-
-    kodimonitor = None
-    kodiplayer = None
     sl_exec = None
 
     def __init__(self):
-        self.win = xbmcgui.Window(10000)
-        self.kodimonitor = xbmc.Monitor()
+        win = xbmcgui.Window(10000)
+        kodimonitor = xbmc.Monitor()
 
         # start the webservice (which hosts our silenced audio tracks)
         proxy_runner = ProxyRunner(host='127.0.0.1', allow_ranges=True)
@@ -42,69 +41,116 @@ class MainService:
 
         # discover server
         lmsserver = None
-        while not lmsserver and not self.kodimonitor.abortRequested():
+        while not lmsserver and not kodimonitor.abortRequested():
             log_msg("Waiting for LMS Server...")
             servers = LMSDiscovery().all()
             if servers:
-                server = servers[0]
-                lmsserver = LMSServer(server.get("host"), server.get("port"))
-                log_msg("LMS server discovered - host: %s - port: %s" % (server.get("host"), server.get("port")))
+                server = servers[0]  # for now, just use the first server discovered
+                lmshost = server.get("host")
+                lmsport = server.get("port")
+                lmsserver = LMSServer(lmshost, lmsport, playerid)
+                log_msg("LMS server discovered - host: %s - port: %s" % (lmshost, lmsport))
             else:
-                self.kodimonitor.waitForAbort(1)
+                kodimonitor.waitForAbort(1)
 
-        # publish lmsdetails as window properties for the plugin entry
-        self.win.setProperty("lmsserver", "%s:%s" % (server.get("host"), server.get("port")))
-        self.win.setProperty("lmsplayer", playerid)
+        if lmsserver:
+            # publish lmsdetails as window properties for the plugin entry
+            win.setProperty("lmshost", lmshost)
+            win.setProperty("lmsport", str(lmsport))
+            win.setProperty("lmsplayerid", playerid)
 
-        # start squeezelite executable
-        self.start_squeezelite(lmsserver, playerid)
+            # start squeezelite executable
+            self.start_squeezelite(lmsserver)
 
-        # initialize kodi player monitor
-        self.kodiplayer = KodiPlayer(win=self.win, playerid=playerid, lmsserver=lmsserver, webport=webport)
+            # initialize kodi player monitor
+            kodiplayer = KodiPlayer(lmsserver=lmsserver, webport=webport)
 
-        # keep the threads alive
-        while not self.kodimonitor.abortRequested():
+            prev_count = 0
+            prev_title = ""
 
-            try:
-                # monitor player status on/off
-                if self.kodiplayer.initialized:
-                    # make sure that the player is still alive
-                    if not self.kodiplayer.lmsplayer:
-                        self.kodiplayer.lmsplayer = self.kodiplayer.get_lmsplayer()
+            # monitor the lms player
+            while not kodimonitor.abortRequested():
 
-                    if self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "stop" and xbmc.getInfoLabel(
-                            "MusicPlayer.getProperty(sl_path)"):
-                        self.kodiplayer.stop()
-                    elif not self.kodiplayer.isPlayingAudio() and self.kodiplayer.lmsplayer.mode == "play":
-                        self.kodiplayer.create_playlist()
-            except Exception as exc:
-                log_exception(__name__, exc)
+                # poll the status every interval
+                lmsserver.update_status()
 
-            # TODO: check if LMS server is still alive
+                # make sure that the status is not actually changing right now
+                if not lmsserver.state_changing:
+                    # the state is a combi of a few player properties, perform actions if one of them changed
+                    player_lms_file = xbmc.getInfoLabel("MusicPlayer.Property(sl_path)").decode("utf-8")
+                    cur_title = lmsserver.cur_title
 
-            # sleep for 5 seconds
-            self.kodimonitor.waitForAbort(5)
+                    # player state changed
+                    if kodiplayer.is_playing and player_lms_file and lmsserver.mode == "stop":
+                        # playback stopped
+                        log_msg("stop requested by lms server")
+                        kodiplayer.stop()
+                    elif player_lms_file and xbmc.getCondVisibility("Player.Paused") and lmsserver.mode == "play":
+                        # playback resumed
+                        log_msg("resume requested by lms server")
+                        xbmc.executebuiltin("PlayerControl(play)")
+                    elif not kodiplayer.is_playing and lmsserver.mode == "play":
+                        # playback started
+                        log_msg("play requested by lms server")
+                        kodiplayer.create_playlist()
+                    elif player_lms_file and not xbmc.getCondVisibility("Player.Paused") and lmsserver.mode == "pause":
+                        # playback paused
+                        log_msg("pause requested by lms server")
+                        kodiplayer.pause()
+                    elif player_lms_file and player_lms_file != lmsserver.status["url"]:
+                        # other track requested
+                        log_msg("next track requested by lms server")
+                        kodiplayer.create_playlist()
+
+                    # monitor while playing
+                    if kodiplayer.is_playing and lmsserver.mode == "play":
+                        cur_count = lmsserver.status["playlist_tracks"]
+                        if (cur_count != prev_count) or (cur_title != prev_title):
+                            # playlist changed
+                            log_msg("playlist changed on lms server")
+                            if xbmc.getCondVisibility("Player.IsInternetStream"):
+                                kodiplayer.create_playlist()
+                            else:
+                                kodiplayer.create_playlist(True)
+                            prev_count = cur_count
+                        # monitor seeking
+                        if xbmc.getCondVisibility("!Player.IsInternetStream"):
+                            cur_time_lms = int(lmsserver.time)
+                            cur_time_kodi = kodiplayer.cur_time()
+                            if cur_time_kodi != cur_time_lms and abs(
+                                    cur_time_lms - cur_time_kodi) > 2 and not xbmc.getCondVisibility("Player.Paused"):
+                                # seek started
+                                log_msg(
+                                    "seek requested by lms server - kodi-time: %s  - lmstime: %s" %
+                                    (cur_time_kodi, cur_time_lms))
+                                kodiplayer.seekTime(cur_time_kodi)
+
+                prev_title = cur_title
+
+                # sleep for 1 seconds
+                kodimonitor.waitForAbort(1)
 
         # Abort was requested while waiting. We should exit
         log_msg('Shutdown requested !', xbmc.LOGNOTICE)
-        self.win.setProperty("lmsexit", "true")
-        self.kodiplayer.exit = True
+        win.setProperty("lmsexit", "true")
+        kodiplayer.close()
 
-        # stop the extra threads
+        # stop the extra threads and cleanup
         self.stop_squeezelite()
         proxy_runner.stop()
         proxy_runner = None
+        del win
+        del kodimonitor
+        del kodiplayer
+        log_msg('stopped', xbmc.LOGNOTICE)
 
-        # cleanup objects
-        self.close()
-
-    def start_squeezelite(self, lmsserver, playerid):
+    def start_squeezelite(self, lmsserver):
         '''On supported platforms we include squeezelite binary'''
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
         proc = self.get_squeezelite_binary()
         if proc:
             log_msg("Starting Squeezelite binary")
-            args = [proc, "-s", lmsserver.host, "-C", "2", "-m", playerid, "-n", playername, "-M", "Kodi"]
+            args = [proc, "-s", lmsserver.host, "-C", "2", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi"]
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
@@ -141,11 +187,3 @@ class MainService:
         else:
             log_msg("Unsupported platform! - for iOS and Android you need to install a squeezeplayer app yourself and mure sure it's running in the background.")
         return sl_binary
-
-    def close(self):
-        '''Cleanup Kodi Cpython instances'''
-        del self.win
-        del self.kodimonitor
-        del self.kodiplayer.playlist
-        del self.kodiplayer
-        log_msg('stopped', xbmc.LOGNOTICE)
