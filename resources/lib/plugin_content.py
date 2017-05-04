@@ -18,7 +18,7 @@ from urllib import quote_plus
 import sys
 import os
 from operator import itemgetter
-from lmsserver import LMSServer, FULLTAGS
+from lmsserver import LMSServer, TAGS_BASIC, TAGS_FULL
 
 PLUGIN_BASE = "plugin://%s/" % ADDON_ID
 
@@ -69,7 +69,7 @@ class PluginContent:
         '''get albums from server'''
         params = self.params.get("params")
         xbmcplugin.setContent(int(sys.argv[1]), "albums")
-        request_str = "albums 0 100000 tags:%s" % FULLTAGS
+        request_str = "albums 0 100000 tags:%s" % TAGS_FULL
         if params:
             request_str += " %s" % params
             if "artist_id" in params:
@@ -84,7 +84,7 @@ class PluginContent:
         '''get artists from server'''
         params = self.params.get("params")
         xbmcplugin.setContent(int(sys.argv[1]), "artists")
-        request_str = "artists 0 100000 tags:%s" % FULLTAGS
+        request_str = "artists 0 100000 tags:%s" % TAGS_FULL
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -97,34 +97,41 @@ class PluginContent:
         '''get tracks from server'''
         params = self.params.get("params", "")
         xbmcplugin.setContent(int(sys.argv[1]), "songs")
-        if "sql" in params:
-            request_str = "tracks 0 100000 tags:dguxcyajlKAG"  # somehow the request fails if the rating tag is requested
-        else:
-            request_str = "tracks 0 100000 tags:%s" % FULLTAGS
+        request_str = "tracks 0 100000 tags:%s" % TAGS_BASIC
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
+        listitems = []
         if result:
-            for item in result.get("titles_loop"):
-                self.create_track_listitem(item)
+            result = self.lmsserver.process_trackdetails(result["titles_loop"])
+            result = [self.create_track_listitem(item) for item in result]
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
     def playlisttracks(self):
         '''get tracks from server'''
         playlistid = self.params.get("playlistid")
         xbmcplugin.setContent(int(sys.argv[1]), "songs")
-        request_str = "playlists tracks 0 100000 tags:%s playlist_id:%s" % (FULLTAGS, playlistid)
+        request_str = "playlists tracks 0 100000 tags:%s playlist_id:%s" % (TAGS_BASIC, playlistid)
         result = self.lmsserver.send_request(request_str)
         if result:
-            for item in result.get("playlisttracks_loop"):
-                self.create_track_listitem(item)
+            result = self.lmsserver.process_trackdetails(result["playlisttracks_loop"])
+            result = [self.create_track_listitem(item) for item in result]
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
+    def currentplaylist(self):
+        '''get the current playlist loaded in the player'''
+        playlistid = self.params.get("playlistid")
+        xbmcplugin.setContent(int(sys.argv[1]), "songs")
+        result = self.lmsserver.cur_playlist(True)
+        if result:
+            result = [self.create_track_listitem(item) for item in result]
+        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+    
     def playlists(self):
         '''get playlists from server'''
         xbmcplugin.setContent(int(sys.argv[1]), "files")
         params = self.params.get("params")
-        request_str = "playlists 0 100000 tags:guxcyajlKR"
+        request_str = "playlists 0 100000 tags:%s" %TAGS_FULL
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -138,7 +145,7 @@ class PluginContent:
         '''get genres from server'''
         xbmcplugin.setContent(int(sys.argv[1]), "files")
         params = self.params.get("params")
-        request_str = "genres 0 100000 tags:guxcyajlKR"
+        request_str = "genres 0 100000 tags:%s" % TAGS_FULL
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -153,7 +160,7 @@ class PluginContent:
         '''get years from server'''
         xbmcplugin.setContent(int(sys.argv[1]), "files")
         params = self.params.get("params")
-        request_str = "years 0 100000 tags:guxcyajlKR"
+        request_str = "years 0 100000 tags:%s" %TAGS_FULL
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -168,7 +175,7 @@ class PluginContent:
         '''explore musicfolder on the server'''
         xbmcplugin.setContent(int(sys.argv[1]), "files")
         params = self.params.get("params")
-        request_str = "musicfolder 0 100000 tags:dguxcyajlKR"
+        request_str = "musicfolder 0 100000 tags:%s" %TAGS_FULL
         if params:
             request_str += " %s" % params
         result = self.lmsserver.send_request(request_str)
@@ -189,7 +196,7 @@ class PluginContent:
     def favorites(self):
         '''get favorites from server'''
         xbmcplugin.setContent(int(sys.argv[1]), "files")
-        request_str = "favorites items 0 100000 want_url:1 tags:dguxcyajlKR"
+        request_str = "favorites items 0 100000 want_url:1 tags:%s" %TAGS_FULL
         params = self.params.get("params")
         if params:
             request_str += " %s" % params
@@ -197,20 +204,16 @@ class PluginContent:
         if result:
             for item in result.get("loop_loop"):
                 thumb = self.lmsserver.get_thumb(item)
-                if not thumb and item["isaudio"] and "url" in item:
-                    track_details = self.get_songinfo(item["url"])
-                    if track_details and not track_details.get("remote"):
-                        self.create_track_listitem(track_details)
-                        continue
-                    elif track_details:
-                        thumb = self.lmsserver.get_thumb(track_details)
-                if item["isaudio"]:
+                if item.get("isaudio") and "title" in item:
+                    track_details = self.lmsserver.trackdetails(item)
+                    self.create_track_listitem(track_details)
+                elif item["isaudio"] and "url" in item:
+                    result = self.lmsserver.send_request("songinfo 0 100 tags:%s url:%s" %(TAGS_FULL, item["url"]))
                     cmd = "command&params=" + quote_plus("favorites playlist play item_id:%s" % item["id"])
                     self.create_generic_listitem(item["name"], thumb, cmd, False)
                 else:
                     cmd = "favorites&params=item_id:%s" % item["id"]
                     self.create_generic_listitem(item["name"], thumb, cmd)
-
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
     def get_menu(self, node):
@@ -278,6 +281,13 @@ class PluginContent:
 
     def menu(self):
         node = self.params.get("node", "home")
+        # show current playlist in menu
+        if node == "home":
+            result = self.lmsserver.send_request("playlist tracks ?")
+            if result:
+                count = int(result["_tracks"])
+                if count > 0:
+                    self.create_generic_listitem("Current Playlist", "", "currentplaylist")
         for item in self.get_menu(node):
             thumb = self.lmsserver.get_thumb(item)
             self.create_generic_listitem(item["label"], thumb, item["cmd"])
@@ -370,7 +380,7 @@ class PluginContent:
                 search = kb.getText().replace(" ", "[SP]")
             request_str = request_str.replace("__TAGGEDINPUT__", search)
         if not "tags:" in request_str:
-            request_str += " tags:dguxcyajlKRAG wantMetadata:1"
+            request_str += " tags:%s wantMetadata:1" %TAGS_FULL
         result = self.lmsserver.send_request(request_str)
         if "item_loop" in result:
             result = result["item_loop"]
@@ -446,7 +456,7 @@ class PluginContent:
 
     def radios(self):
         '''get radio items'''
-        request_str = "radios 0 100000 tags:guxcyajlKR"
+        request_str = "radios 0 100000 tags:%s" %TAGS_FULL
         result = self.lmsserver.send_request(request_str)
         if result:
             for item in result.get("radioss_loop"):
@@ -553,39 +563,55 @@ class PluginContent:
 
     def create_track_listitem(self, lms_item):
         '''Create Kodi listitem from LMS track details'''
-        thumb = self.lmsserver.get_thumb(lms_item)
-        listitem = xbmcgui.ListItem(lms_item.get("title"))
+        listitem = xbmcgui.ListItem(lms_item["title"])
         listitem.setInfo('music',
                          {
-                             'title': lms_item.get("title"),
-                             'artist': "/".join(lms_item.get("trackartist", "").split(", ")),
+                             'title': lms_item["title"],
+                             'artist': lms_item["trackartist"],
                              'album': lms_item.get("album"),
                              'duration': lms_item.get("duration"),
                              'discnumber': lms_item.get("disc"),
                              'rating': lms_item.get("rating"),
-                             'genre': "/".join(lms_item.get("genres", "").split(", ")),
+                             'genre': lms_item["genres"],
                              'tracknumber': lms_item.get("track_number"),
                              'lyrics': lms_item.get("lyrics"),
                              'year': lms_item.get("year"),
-                             'mediatype': lms_item.get("song")
+                             'comment': lms_item.get("comment")
                          })
-        listitem.setArt({"thumb": thumb})
-        listitem.setIconImage(thumb)
-        listitem.setThumbnailImage(thumb)
+        listitem.setArt({"thumb": lms_item["thumb"]})
+        listitem.setIconImage(lms_item["thumb"])
+        listitem.setThumbnailImage(lms_item["thumb"])
         listitem.setProperty("isPlayable", "false")
         listitem.setProperty("DBYPE", "song")
         cmd = quote_plus("playlist play %s" % lms_item.get("url"))
-        url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
-        # contextmenu
+        
         contextmenu = []
-        params = quote_plus("playlist play %s" % lms_item["url"])
-        contextmenu.append(("Play now", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
-        params = quote_plus("playlist insert %s" % lms_item["url"])
-        contextmenu.append(("Play next", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
-        params = quote_plus("playlist add %s" % lms_item["url"])
-        contextmenu.append(("Insert at end", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+        if "playlist index" in lms_item and lms_item["playlist index"]:
+            # contextmenu for now playing list
+            pl_index = int(lms_item["playlist index"])
+            pl_pos = int(self.lmsserver.cur_index)
+            cmd = quote_plus("playlist index %s" % pl_index)
+            params = quote_plus("playlist index %s" % pl_index)
+            contextmenu.append(("Play now", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append(("Play Next", "RunPlugin(%s?action=playlistplaynext&params=%s)" % (PLUGIN_BASE, pl_index)))
+            params = quote_plus("playlist move %s +1" % pl_index)
+            contextmenu.append(("Move up", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            params = quote_plus("playlist move %s -1" % pl_index)
+            contextmenu.append(("Move down", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            params = quote_plus("playlist delete %s" % pl_index)
+            contextmenu.append(("Delete", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            params = quote_plus("playlist clear")
+            contextmenu.append(("Clear playlist", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+        else:
+            # normal contextmenu
+            params = quote_plus("playlist play %s" % lms_item["url"])
+            contextmenu.append(("Play now", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            params = quote_plus("playlist insert %s" % lms_item["url"])
+            contextmenu.append(("Play next", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            params = quote_plus("playlist add %s" % lms_item["url"])
+            contextmenu.append(("Insert at end", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
         listitem.addContextMenuItems(contextmenu, True)
-
+        url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=False)
 
@@ -598,8 +624,18 @@ class PluginContent:
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
                                     url=url, listitem=listitem, isFolder=is_folder)
 
+    def playlistplaynext(self):
+        _id = self.params.get("params")
+        result = self.lmsserver.send_request("playlist index ?")
+        if result:
+            pl_pos = int(result["_index"])
+            if int(_id) > pl_pos:
+                pl_pos += 1
+            cmd = "playlist move %s %s" %(_id, pl_pos)
+            self.lmsserver.send_request(cmd)
+    
     def command(self):
-        '''play item'''
+        '''play item or other command'''
         cmd = self.params.get("params")
         self.lmsserver.send_request(cmd)
-        xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=True, listitem=xbmcgui.ListItem())
+        #xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=True, listitem=xbmcgui.ListItem())

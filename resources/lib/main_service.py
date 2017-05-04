@@ -11,24 +11,25 @@
 from utils import log_msg, ADDON_ID, log_exception, get_mac
 from player_monitor import KodiPlayer
 from httpproxy import ProxyRunner
-from discovery import LMSDiscovery
-from lmsserver import LMSServer
+from lmsserver import LMSServer, LMSDiscovery
 import xbmc
 import xbmcaddon
 import xbmcgui
 import subprocess
 import os
 import sys
-from shoutserver import ShoutServer
 
 
 class MainService:
     '''our main background service running the various threads'''
     sl_exec = None
+    prev_checksum = ""
+    temp_power_off = False
 
     def __init__(self):
         win = xbmcgui.Window(10000)
         kodimonitor = xbmc.Monitor()
+        win.clearProperty("lmsexit")
 
         # start the webservice (which hosts our silenced audio tracks)
         proxy_runner = ProxyRunner(host='127.0.0.1', allow_ranges=True)
@@ -65,68 +66,10 @@ class MainService:
             # initialize kodi player monitor
             kodiplayer = KodiPlayer(lmsserver=lmsserver, webport=webport)
 
-            prev_count = 0
-            prev_title = ""
-
-            # monitor the lms player
+            # mainloop
             while not kodimonitor.abortRequested():
-
-                # poll the status every interval
-                lmsserver.update_status()
-
-                # make sure that the status is not actually changing right now
-                if not lmsserver.state_changing:
-                    # the state is a combi of a few player properties, perform actions if one of them changed
-                    player_lms_file = xbmc.getInfoLabel("MusicPlayer.Property(sl_path)").decode("utf-8")
-                    cur_title = lmsserver.cur_title
-
-                    # player state changed
-                    if kodiplayer.is_playing and player_lms_file and lmsserver.mode == "stop":
-                        # playback stopped
-                        log_msg("stop requested by lms server")
-                        kodiplayer.stop()
-                    elif player_lms_file and xbmc.getCondVisibility("Player.Paused") and lmsserver.mode == "play":
-                        # playback resumed
-                        log_msg("resume requested by lms server")
-                        xbmc.executebuiltin("PlayerControl(play)")
-                    elif not kodiplayer.is_playing and lmsserver.mode == "play":
-                        # playback started
-                        log_msg("play requested by lms server")
-                        kodiplayer.create_playlist()
-                    elif player_lms_file and not xbmc.getCondVisibility("Player.Paused") and lmsserver.mode == "pause":
-                        # playback paused
-                        log_msg("pause requested by lms server")
-                        kodiplayer.pause()
-                    elif player_lms_file and player_lms_file != lmsserver.status["url"]:
-                        # other track requested
-                        log_msg("next track requested by lms server")
-                        kodiplayer.create_playlist()
-
-                    # monitor while playing
-                    if kodiplayer.is_playing and lmsserver.mode == "play":
-                        cur_count = lmsserver.status["playlist_tracks"]
-                        if (cur_count != prev_count) or (cur_title != prev_title):
-                            # playlist changed
-                            log_msg("playlist changed on lms server")
-                            if xbmc.getCondVisibility("Player.IsInternetStream"):
-                                kodiplayer.create_playlist()
-                            else:
-                                kodiplayer.create_playlist(True)
-                            prev_count = cur_count
-                        # monitor seeking
-                        if xbmc.getCondVisibility("!Player.IsInternetStream"):
-                            cur_time_lms = int(lmsserver.time)
-                            cur_time_kodi = kodiplayer.cur_time()
-                            if cur_time_kodi != cur_time_lms and abs(
-                                    cur_time_lms - cur_time_kodi) > 2 and not xbmc.getCondVisibility("Player.Paused"):
-                                # seek started
-                                log_msg(
-                                    "seek requested by lms server - kodi-time: %s  - lmstime: %s" %
-                                    (cur_time_kodi, cur_time_lms))
-                                kodiplayer.seekTime(cur_time_kodi)
-
-                prev_title = cur_title
-
+                # monitor the LMS state changes
+                self.monitor_lms(kodiplayer, lmsserver)
                 # sleep for 1 seconds
                 kodimonitor.waitForAbort(1)
 
@@ -143,6 +86,82 @@ class MainService:
         del kodimonitor
         del kodiplayer
         log_msg('stopped', xbmc.LOGNOTICE)
+
+    def monitor_lms(self, kodiplayer, lmsserver):
+        '''monitor the state of the lmsserver/player'''
+        # poll the status every interval
+        lmsserver.update_status()
+        # make sure that the status is not actually changing right now
+        if not lmsserver.state_changing and not kodiplayer.is_busy:
+
+            cur_title = lmsserver.cur_title
+
+            # turn off lms player when kodi is playing video
+            if (lmsserver.power == 1 or not self.temp_power_off) and xbmc.getCondVisibility("Player.HasVideo"):
+                lmsserver.send_command("power 0")
+                self.temp_power_off = True
+            elif self.temp_power_off and not xbmc.getCondVisibility("Player.HasVideo"):
+                lmsserver.send_command("power 1")
+                self.temp_power_off = False
+
+            # monitor player details
+            if self.prev_checksum != lmsserver.timestamp:
+                # the playlist was modified
+                self.prev_checksum = lmsserver.timestamp
+                log_msg("playlist changed on lms server")
+                kodiplayer.update_playlist()
+                if kodiplayer.is_playing:
+                    kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
+                
+            # make sure that the kodi player doesnt have shuffle enabled
+            if kodiplayer.is_playing and xbmc.getCondVisibility("Playlist.IsRandom"):
+                log_msg("Playlist is randomized! Reload to unshuffle....")
+                kodiplayer.playlist.unshuffle()
+                kodiplayer.update_playlist()
+                kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
+
+            if kodiplayer.is_playing and lmsserver.mode == "stop":
+                # playback stopped
+                log_msg("stop requested by lms server")
+                kodiplayer.stop()
+            elif kodiplayer.is_playing and xbmc.getCondVisibility("Player.Paused") and lmsserver.mode == "play":
+                # playback resumed
+                log_msg("resume requested by lms server")
+                xbmc.executebuiltin("PlayerControl(play)")
+            elif not kodiplayer.is_playing and lmsserver.mode == "play":
+                # playback started
+                log_msg("play started by lms server")
+                if not len(kodiplayer.playlist):
+                    kodiplayer.update_playlist()
+                kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
+            elif kodiplayer.is_playing and not xbmc.getCondVisibility("Player.Paused") and lmsserver.mode == "pause":
+                # playback paused
+                log_msg("pause requested by lms server")
+                kodiplayer.pause()
+            elif kodiplayer.is_playing and kodiplayer.playlist.getposition() != lmsserver.cur_index:
+                # other track requested
+                log_msg("other track requested by lms server")
+                kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
+            elif kodiplayer.is_playing and lmsserver.mode == "play" and not lmsserver.status["current_title"]:
+                # check if seeking is needed - if current_title has value, it means it's a radio stream so we ignore that
+                # we accept a difference of max 2 seconds
+                cur_time_lms = int(lmsserver.time)
+                cur_time_kodi = kodiplayer.cur_time()
+                if cur_time_kodi != cur_time_lms and abs(
+                        cur_time_lms - cur_time_kodi) > 2 and not xbmc.getCondVisibility("Player.Paused"):
+                    # seek started
+                    log_msg("seek requested by lms server - kodi-time: %s  - lmstime: %s" %
+                            (cur_time_kodi, cur_time_lms))
+                    kodiplayer.is_busy = True
+                    kodiplayer.seekTime(cur_time_lms)
+                    xbmc.sleep(250)
+                    kodiplayer.is_busy = False
+            elif kodiplayer.is_playing and lmsserver.mode == "play":
+                # monitor if title still matches
+                if lmsserver.status["title"] != xbmc.getInfoLabel("MusicPlayer.Title").decode("utf-8"):
+                    log_msg("title mismatch - updating playlist...")
+                    kodiplayer.update_playlist()
+                    kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
 
     def start_squeezelite(self, lmsserver):
         '''On supported platforms we include squeezelite binary'''

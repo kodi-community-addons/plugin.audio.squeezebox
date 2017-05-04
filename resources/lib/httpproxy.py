@@ -35,8 +35,8 @@ class Track:
         '''generate a wave header for our silence stream'''
         file = StringIO.StringIO()
 
-        # always add 10 seconds of additional duration to solve crossfade issues
-        duration += 10
+        # always add 2 seconds of additional duration to solve crossfade issues
+        duration += 2
         numsamples = 44100 * duration
         channels = 2
         samplerate = 44100
@@ -88,12 +88,11 @@ class Track:
         return file.getvalue(), all_cunks_size + 8
 
     def get_silence_mp3(self):
-        with open(os.path.join(os.path.dirname(__file__), "Silent.mp3"), "rb") as f:
+        with open(os.path.join(os.path.dirname(__file__), "bin", "Silent.mp3"), "rb") as f:
             while True:
-                data = f.read(128)
+                data = f.read(8192)
                 if data:
-                    for b in data:
-                        yield b
+                    yield data
                 else:
                     break
 
@@ -104,12 +103,12 @@ class Track:
         bytes_written = 0
         has_frames = True
 
-        filesize = 1024000
+        filesize = 2024000 # hardcoded filelength!
 
         # Get bytes from our silenced mp3 file and loop untill we reach the end
         while bytes_written < filesize and xbmc.getCondVisibility("IsEmpty(Window(Home).Property(lmsexit))"):
             for frame in self.get_silence_mp3():
-
+                
                 # Check if this frame fits in the estimated calculation
                 if bytes_written + len(frame) < filesize:
                     output_buffer.write(frame)
@@ -264,7 +263,6 @@ class ProxyRunner(threading.Thread):
             self.__allowed_ips, allow_ranges
         )
         app = cherrypy.tree.mount(self.__root, '/')
-        # Don't log to the screen by default
         log = cherrypy.log
         log.access_file = ''
         log.error_file = ''

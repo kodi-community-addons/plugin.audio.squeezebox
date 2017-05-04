@@ -12,6 +12,7 @@ from utils import log_msg, log_exception, ADDON_ID
 import xbmc
 import xbmcgui
 import xbmcvfs
+from urllib import quote_plus
 
 DATA_PATH = xbmc.translatePath("special://profile/addon_data/%s/" % ADDON_ID).decode("utf-8")
 
@@ -22,6 +23,7 @@ class KodiPlayer(xbmc.Player):
     trackchanging = False
     exit = False
     is_playing = False
+    is_busy = False
 
     def __init__(self, **kwargs):
         self.lmsserver = kwargs.get("lmsserver")
@@ -48,26 +50,33 @@ class KodiPlayer(xbmc.Player):
             log_msg("Playback unpaused")
 
     def onPlayBackEnded(self):
-        log_msg("onPlayBackEnded")
         self.is_playing = False
 
     def onPlayBackStarted(self):
         '''Kodi event fired when playback is started (including next tracks)'''
-        if self.is_playing and not self.lmsserver.state_changing:
-            player_lms_file = xbmc.getInfoLabel("MusicPlayer.Property(sl_path)").decode("utf-8")
-            if player_lms_file and player_lms_file != self.lmsserver.status["url"]:
-                # next song requested
-                log_msg("next track requested by kodi player")
-                self.lmsserver.next_track()
-        self.is_playing = True
-
-    def onQueueNextItem(self):
-        log_msg("onQueueNextItem")
+        is_busy = True
+        if self.isPlayingVideo():
+            # player is now playing video ! - disable the LMS player
+            self.is_playing = False
+            self.lmsserver.send_command("power 0")
+            log_msg("Kodi started playing video - disabled the LMS player")
+        else:
+            self.wait_for_player()
+            # set the is_playing bool to indicate we are playing LMS content
+            self.is_playing = xbmc.getCondVisibility("!IsEmpty(MusicPlayer.Property(sl_path))") == 1
+            if self.is_playing and not self.lmsserver.state_changing:
+                if self.playlist.getposition() != self.lmsserver.cur_index:
+                    # next song requested
+                    # figure out which track is requested
+                    new_index = self.playlist.getposition()
+                    log_msg("other track requested by kodi player - index: %s" % new_index)
+                    self.lmsserver.send_command("playlist index %s" % new_index)
+        is_busy = False
 
     def onPlayBackSpeedChanged(self, speed):
         '''Kodi event fired when player is fast forwarding/rewinding'''
-        log_msg("onPlayBackSpeedChanged")
         if self.isPlayingAudio() and self.lmsserver.mode == "play":
+            log_msg("User is requesting to fast forward or rewind")
             if speed > 1:
                 self.lmsserver.send_command("time +10")
             elif speed < 0:
@@ -81,12 +90,9 @@ class KodiPlayer(xbmc.Player):
             cur_time_kodi = self.lmsserver.time
         return cur_time_kodi
 
-    def onPlayBackSeekChapter(self):
-        log_msg("onPlayBackSeekChapter")
-
     def onPlayBackSeek(self, seekTime, seekOffset):
-        if self.is_playing and not self.lmsserver.state_changing:
-            log_msg("onPlayBackSeek time: %s - seekOffset: %s" % (seekTime, seekOffset))
+        '''Kodi event fired when the user is seeking'''
+        if self.is_playing and not self.lmsserver.state_changing and not self.is_busy:
             self.lmsserver.send_command("time %s" % (int(seekTime) / 1000))
 
     def onPlayBackStopped(self):
@@ -99,32 +105,25 @@ class KodiPlayer(xbmc.Player):
 
     def create_listitem(self, lms_song):
         '''Create Kodi listitem from LMS song details'''
-        thumb = self.lmsserver.get_thumb(lms_song)
-        listitem = xbmcgui.ListItem('Squeezelite')
-        artists = " / ".join(lms_song.get("trackartist", "").split(", "))
-        if not artists:
-            artists = " / ".join(lms_song.get("artist", "").split(", "))
-        genres = " / ".join(lms_song.get("genres", "").split(", "))
-        if not genres:
-            genres = " / ".join(lms_song.get("genre", "").split(", "))
-
+        listitem = xbmcgui.ListItem(lms_song["title"])
         listitem.setInfo('music',
                          {
-                             'title': lms_song.get("title"),
-                             'artist': artists,
+                             'title': lms_song["title"],
+                             'artist': lms_song["trackartist"],
                              'album': lms_song.get("album"),
                              'duration': lms_song.get("duration"),
                              'discnumber': lms_song.get("disc"),
                              'rating': lms_song.get("rating"),
-                             'genre': genres,
+                             'genre': lms_song["genres"],
                              'tracknumber': lms_song.get("track_number"),
                              'lyrics': lms_song.get("lyrics"),
-                             'year': lms_song.get("year")
+                             'year': lms_song.get("year"),
+                             'comment': lms_song.get("comment")
                          })
-        listitem.setArt({"thumb": thumb})
-        listitem.setIconImage(thumb)
-        listitem.setThumbnailImage(thumb)
-        if lms_song.get("remote_title") or not lms_song.get("duration"):
+        listitem.setArt({"thumb": lms_song["thumb"]})
+        listitem.setIconImage(lms_song["thumb"])
+        listitem.setThumbnailImage(lms_song["thumb"])
+        if lms_song.get("remote_title") or not lms_song.get("duration") or lms_song.get("duration") == "0":
             # workaround for radio streams
             file_name = "http://127.0.0.1:%s/track/radio" % (self.webport)
         else:
@@ -132,37 +131,27 @@ class KodiPlayer(xbmc.Player):
         listitem.setProperty("sl_path", lms_song["url"])
         listitem.setContentLookup(False)
         listitem.setProperty('do_not_analyze', 'true')
+        cmd = quote_plus("playlist index %s" % lms_song["playlist index"])
+        org_url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
+        listitem.setProperty("original_listitem_url",org_url)
         return listitem, file_name
 
-    def create_playlist(self, skipplay=False):
-        '''Create Kodi playlist from items in the LMS playlist'''
-        self.playlist.clear()
-        squeezeplaylist = self.lmsserver.cur_playlist()
-        if squeezeplaylist:
-            # add first item with full details and start playing
-            li = self.create_listitem(squeezeplaylist[0])
-            self.playlist.add(li[1], li[0])
-            if not skipplay:
-                self.play(self.playlist, startpos=0)
-                self.do_seek()
-            # add remaining items with basic details to the playlist while already playing
-            if len(squeezeplaylist) > 1:
-                for item in squeezeplaylist[1:]:
-                    li, file_name = self.create_listitem(item)
-                    self.playlist.add(file_name, li)
-
-    def do_seek(self):
-        # seek requested
-        # ignore as seek is not implemented in the webserver (accept-ranges)
-        pass
-        # if self.lmsplayer.time_elapsed:
-        # seektime = int(self.lmsplayer.time_elapsed)*1000
-        # log_msg("seek requested... %s" %seektime)
-        # self.wait_for_player()
-        # self.seekTime(seektime)
+    def update_playlist(self):
+        '''Update the playlist'''
+        lmsplaylist = self.lmsserver.cur_playlist(True)
+        if len(self.playlist) > len(lmsplaylist):
+            log_msg("clearing playlist...")
+            self.playlist.clear()
+        for item in lmsplaylist:
+            li, file_name = self.create_listitem(item)
+            self.playlist.add(file_name, li, item["playlist index"])
+        # refresh now playing playlist if needed
+        if xbmc.getInfoLabel("Container.FolderPath") in ["playlistmusic://", "plugin://plugin.audio.squeezebox/?action=currentplaylist"]:
+            xbmc.executebuiltin("Container.Refresh")
 
     def wait_for_player(self):
         count = 0
+        xbmc.sleep(500)
         while not xbmc.getCondVisibility("Player.HasAudio") and count < 10:
             xbmc.sleep(250)
             count += 1

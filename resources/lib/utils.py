@@ -26,6 +26,13 @@ ADDON_ID = "plugin.audio.squeezebox"
 KODI_VERSION = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
 KODILANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
 
+try:
+    from multiprocessing.pool import ThreadPool
+    SUPPORTS_POOL = True
+except Exception:
+    SUPPORTS_POOL = False
+
+
 
 def log_msg(msg, loglevel=xbmc.LOGNOTICE):
     '''log message to kodi log'''
@@ -54,3 +61,21 @@ def get_mac():
     else:
         log_msg("Detected Mac-Address: %s" % mac)
     return mac
+
+def process_method_on_list(method_to_run, items):
+    '''helper method that processes a method on each listitem with pooling if the system supports it'''
+    all_items = []
+    if SUPPORTS_POOL:
+        pool = ThreadPool()
+        try:
+            all_items = pool.map(method_to_run, items)
+        except Exception:
+            # catch exception to prevent threadpool running forever
+            log_msg(format_exc(sys.exc_info()))
+            log_msg("Error in %s" % method_to_run)
+        pool.close()
+        pool.join()
+    else:
+        all_items = [method_to_run(item) for item in items]
+    all_items = filter(None, all_items)
+    return all_items
