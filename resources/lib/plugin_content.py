@@ -293,7 +293,7 @@ class PluginContent:
             self.create_generic_listitem(item["label"], thumb, item["cmd"])
         # show sync settings in menu
         if node == "home":
-            self.create_generic_listitem("Synchroniseren", "", "browse&params=syncsettings 0 100")
+            self.create_generic_listitem("Synchroniseren", "", "syncsettings")
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
     def search(self):
@@ -368,7 +368,7 @@ class PluginContent:
         return cmd
 
     def browse(self):
-        '''get sublevel entry for an app'''
+        '''browse generic (app/radio) listing'''
         request_str = self.params.get("params")
         contenttype = self.params.get("contenttype", "files")
 
@@ -387,6 +387,7 @@ class PluginContent:
         else:
             result = result["loop_loop"]
         for item in result:
+            log_msg(item)
             thumb = self.lmsserver.get_thumb(item)
             app = request_str.split(" ")[0]
             itemtype = item.get("type", "")
@@ -454,6 +455,28 @@ class PluginContent:
 
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
+    def syncsettings(self):
+        '''sync settings'''
+        xbmcplugin.setContent(int(sys.argv[1]), "files")
+        result = self.lmsserver.send_request("syncsettings 0 100")
+        for item in result["item_loop"]:
+            if "actions" in item:
+                # player entry
+                syncwith = item["actions"]["do"]["params"]["syncWith"]
+                unsyncwith = item["actions"]["do"]["params"]["unsyncWith"]
+                label = item["text"]
+                if unsyncwith != 0 and not syncwith == 0:
+                    label += " [SYNC]"
+                actionstr = "jivesync syncWith:%s unsyncWith:%s" %(syncwith, unsyncwith)
+                cmd = "command&params=%s&refresh=true" % quote_plus(actionstr)
+                self.create_generic_listitem(label, "", cmd, False)
+            else:
+                # header with no action
+                self.create_generic_listitem(item["text"], "", "syncsettings")
+
+        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+
+    
     def radios(self):
         '''get radio items'''
         request_str = "radios 0 100000 tags:%s" %TAGS_FULL
@@ -637,5 +660,9 @@ class PluginContent:
     def command(self):
         '''play item or other command'''
         cmd = self.params.get("params")
+        refresh = self.params.get("refresh","") == "true"
+        log_msg(cmd)
         self.lmsserver.send_request(cmd)
+        if refresh:
+            xbmc.executebuiltin("Container.Refresh")
         #xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=True, listitem=xbmcgui.ListItem())
