@@ -387,7 +387,6 @@ class PluginContent:
         else:
             result = result["loop_loop"]
         for item in result:
-            log_msg(item)
             thumb = self.lmsserver.get_thumb(item)
             app = request_str.split(" ")[0]
             itemtype = item.get("type", "")
@@ -473,10 +472,8 @@ class PluginContent:
             else:
                 # header with no action
                 self.create_generic_listitem(item["text"], "", "syncsettings")
-
         xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
-    
     def radios(self):
         '''get radio items'''
         request_str = "radios 0 100000 tags:%s" %TAGS_FULL
@@ -661,7 +658,6 @@ class PluginContent:
         '''play item or other command'''
         cmd = self.params.get("params")
         refresh = self.params.get("refresh","") == "true"
-        log_msg(cmd)
         self.lmsserver.send_request(cmd)
         if refresh:
             xbmc.executebuiltin("Container.Refresh")

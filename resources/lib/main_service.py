@@ -18,7 +18,7 @@ import xbmcgui
 import subprocess
 import os
 import sys
-
+import xbmcvfs
 
 class MainService:
     '''our main background service running the various threads'''
@@ -152,10 +152,10 @@ class MainService:
                     # seek started
                     log_msg("seek requested by lms server - kodi-time: %s  - lmstime: %s" %
                             (cur_time_kodi, cur_time_lms))
-                    kodiplayer.is_busy = True
-                    kodiplayer.seekTime(cur_time_lms)
-                    xbmc.sleep(250)
-                    kodiplayer.is_busy = False
+                    # kodiplayer.is_busy = True
+                    # kodiplayer.seekTime(cur_time_lms)
+                    # xbmc.sleep(250)
+                    # kodiplayer.is_busy = False
             elif kodiplayer.is_playing and lmsserver.mode == "play":
                 # monitor if title still matches
                 if lmsserver.status["title"] != xbmc.getInfoLabel("MusicPlayer.Title").decode("utf-8"):
@@ -166,18 +166,16 @@ class MainService:
     def start_squeezelite(self, lmsserver):
         '''On supported platforms we include squeezelite binary'''
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
-        proc = self.get_squeezelite_binary()
-        if proc:
-            log_msg("Starting Squeezelite binary")
-            args = [proc, "-s", lmsserver.host, "-C", "2", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi"]
+        sl_binary = self.get_squeezelite_binary()
+        if sl_binary:
+            sl_output = self.get_audiodevice(sl_binary)
+            log_msg("Starting Squeezelite binary - Using audio device: %s" %sl_output)
+            args = [sl_binary, "-s", lmsserver.host, "-C", "2", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
-            try:
-                self.sl_exec = subprocess.Popen(args, startupinfo=startupinfo)
-            except Exception as exc:
-                log_exception(__name__, exc)
+            self.sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT)
         if not self.sl_exec:
             log_msg("The Squeezelite binary was not automatically started, "
                     "you should make sure of starting it yourself, e.g. as a service.")
@@ -196,13 +194,38 @@ class MainService:
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "win32", "squeezelite-win.exe")
         elif xbmc.getCondVisibility("System.Platform.OSX"):
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "osx", "squeezelite")
+            import stat
+            os.chmod(sl_binary, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        elif xbmcvfs.exists("/storage/.kodi/addons/virtual.multimedia-tools/bin/squeezelite"):
+            sl_binary = "/storage/.kodi/addons/virtual.multimedia-tools/bin/squeezelite"
         elif xbmc.getCondVisibility("System.Platform.Linux.RaspberryPi"):
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-arm")
+            os.system("chmod a+x %s" %sl_binary)
         elif xbmc.getCondVisibility("System.Platform.Linux"):
             if sys.maxsize > 2**32:
                 sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-i64")
             else:
                 sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-x86")
+            os.system("chmod a+x %s" %sl_binary)
         else:
             log_msg("Unsupported platform! - for iOS and Android you need to install a squeezeplayer app yourself and mure sure it's running in the background.")
         return sl_binary
+        
+    @staticmethod
+    def get_audiodevice(sl_binary):
+        # guess the audio device to use
+        # todo: make user configurable ?
+        args = [sl_binary, "-l"]
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
+        sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        stdout, stderr = sl_exec.communicate()
+        for line in stdout.splitlines():
+            line = line.strip().split(" ")[0]
+            if "default" in line:
+                log_msg("Using audio device: %s" %line)
+                return line
+        return "default"
+        

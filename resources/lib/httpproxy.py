@@ -87,45 +87,6 @@ class Track:
 
         return file.getvalue(), all_cunks_size + 8
 
-    def get_silence_mp3(self):
-        with open(os.path.join(os.path.dirname(__file__), "bin", "Silent.mp3"), "rb") as f:
-            while True:
-                data = f.read(8192)
-                if data:
-                    yield data
-                else:
-                    break
-
-    def send_radio_stream(self, max_buffer_size=65535):
-
-        # Initialize some loop vars
-        output_buffer = StringIO.StringIO()
-        bytes_written = 0
-        has_frames = True
-
-        filesize = 2024000 # hardcoded filelength!
-
-        # Get bytes from our silenced mp3 file and loop untill we reach the end
-        while bytes_written < filesize and xbmc.getCondVisibility("IsEmpty(Window(Home).Property(lmsexit))"):
-            for frame in self.get_silence_mp3():
-                
-                # Check if this frame fits in the estimated calculation
-                if bytes_written + len(frame) < filesize:
-                    output_buffer.write(frame)
-                    bytes_written += len(frame)
-
-                # Does not fit, we need to truncate the frame data
-                else:
-                    truncate_size = filesize - bytes_written
-                    output_buffer.write(frame[:truncate_size])
-                    bytes_written = filesize
-                    has_frames = False
-
-                # Check if the current buffer needs to be flushed
-                if not has_frames or output_buffer.tell() > max_buffer_size:
-                    yield output_buffer.getvalue()
-                    output_buffer.truncate(0)
-
     def send_audio_stream(self, filesize, wave_header=None, max_buffer_size=65535):
 
         # Initialize some loop vars
@@ -139,8 +100,8 @@ class Track:
             bytes_written = output_buffer.tell()
             yield wave_header
             output_buffer.truncate(0)
-
-        # this is where we would normally stream packets from an audio input
+            
+        # this is where we would/could normally stream packets from an audio input
         # In this case we stream only silence until the end is reached
         while bytes_written < filesize:
 
@@ -179,15 +140,14 @@ class Track:
             duration = int(track_id)
         except:
             is_radio = True
-            duration = 60
+            duration = 3600
 
         # Calculate file size, and obtain the header
-        if not is_radio:
-            file_header, filesize = self._get_wave_header(duration)
+        file_header, filesize = self._get_wave_header(duration)
 
         # headers
         if is_radio:
-            cherrypy.response.headers['Content-Type'] = 'audio/mp3'
+            cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
             cherrypy.response.headers['Connection'] = 'chunked'
         elif cherrypy.request.headers.get('Range', '') == "bytes=0-":
             cherrypy.response.status = '206 Partial Content'
@@ -217,10 +177,7 @@ class Track:
 
         # If method was GET, write the file content
         if cherrypy.request.method.upper() == 'GET':
-            if is_radio:
-                return self.send_radio_stream()
-            else:
-                return self.send_audio_stream(filesize, file_header)
+            return self.send_audio_stream(filesize, file_header)
 
     default._cp_config = {'response.stream': True}
 
