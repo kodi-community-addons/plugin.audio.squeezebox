@@ -8,14 +8,10 @@
     monitor both LMS and Kodi player
 '''
 
-from utils import log_msg, log_exception, ADDON_ID
+from utils import log_msg, log_exception
 import xbmc
 import xbmcgui
-import xbmcvfs
 from urllib import quote_plus
-
-DATA_PATH = xbmc.translatePath("special://profile/addon_data/%s/" % ADDON_ID).decode("utf-8")
-
 
 class KodiPlayer(xbmc.Player):
     '''Monitor all player events in Kodi'''
@@ -75,12 +71,7 @@ class KodiPlayer(xbmc.Player):
 
     def onPlayBackSpeedChanged(self, speed):
         '''Kodi event fired when player is fast forwarding/rewinding'''
-        if self.isPlayingAudio() and self.lmsserver.mode == "play":
-            log_msg("User is requesting to fast forward or rewind")
-            if speed > 1:
-                self.lmsserver.send_command("time +10")
-            elif speed < 0:
-                self.lmsserver.send_command("time -10")
+        pass
 
     def cur_time(self):
         '''current time of the player - if fails return lms player time'''

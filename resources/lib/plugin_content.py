@@ -21,15 +21,17 @@ from operator import itemgetter
 from lmsserver import LMSServer, TAGS_BASIC, TAGS_FULL
 
 PLUGIN_BASE = "plugin://%s/" % ADDON_ID
-
+ADDON_HANDLE = int(sys.argv[1])
 
 class PluginContent:
     '''Hidden plugin entry point providing some helper features'''
     params = {}
     lmsserver = None
+    addon = None
 
     def __init__(self):
         win = xbmcgui.Window(10000)
+        self.addon = xbmcaddon.Addon(id=ADDON_ID)
 
         # initialize lmsserver object - grab details from window props set by the service
         lmsplayerid = win.getProperty("lmsplayerid").decode("utf-8")
@@ -38,7 +40,7 @@ class PluginContent:
 
         if not lmsplayerid:
             log_msg("Service not yet ready - try again later!")
-            xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+            xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
         else:
 
             self.lmsserver = LMSServer(lmshost, lmsport, lmsplayerid)
@@ -50,10 +52,11 @@ class PluginContent:
                 self.main()
             except Exception as exc:
                 log_exception(__name__, exc)
-                xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+                xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
         # cleanup when done processing
         del win
+        del self.addon
 
     def main(self):
         '''main action, load correct function'''
@@ -68,22 +71,28 @@ class PluginContent:
     def albums(self):
         '''get albums from server'''
         params = self.params.get("params")
-        xbmcplugin.setContent(int(sys.argv[1]), "albums")
-        request_str = "albums 0 100000 tags:%s" % TAGS_FULL
+        xbmcplugin.setContent(ADDON_HANDLE, "albums")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(132))
+        if not "library_id" in params:
+            request_str = "albums 0 100000 tags:%s" % TAGS_FULL
+        else:
+            request_str = "albums tags:%s" % TAGS_FULL
         if params:
             request_str += " %s" % params
             if "artist_id" in params:
                 self.create_generic_listitem("All Tracks", "DefaultMusicSongs.png", "tracks&params=%s" % params)
         result = self.lmsserver.send_request(request_str)
+        log_msg(result)
         if result:
             for item in result.get("albums_loop"):
                 self.create_album_listitem(item)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def artists(self):
         '''get artists from server'''
         params = self.params.get("params")
-        xbmcplugin.setContent(int(sys.argv[1]), "artists")
+        xbmcplugin.setContent(ADDON_HANDLE, "artists")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(133))
         request_str = "artists 0 100000 tags:%s" % TAGS_FULL
         if params:
             request_str += " %s" % params
@@ -91,12 +100,13 @@ class PluginContent:
         if result:
             for item in result.get("artists_loop"):
                 self.create_artist_listitem(item)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def tracks(self):
         '''get tracks from server'''
         params = self.params.get("params", "")
-        xbmcplugin.setContent(int(sys.argv[1]), "songs")
+        xbmcplugin.setContent(ADDON_HANDLE, "songs")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(134))
         request_str = "tracks 0 100000 tags:%s" % TAGS_BASIC
         if params:
             request_str += " %s" % params
@@ -105,31 +115,33 @@ class PluginContent:
         if result:
             result = self.lmsserver.process_trackdetails(result["titles_loop"])
             result = [self.create_track_listitem(item) for item in result]
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def playlisttracks(self):
         '''get tracks from server'''
         playlistid = self.params.get("playlistid")
-        xbmcplugin.setContent(int(sys.argv[1]), "songs")
+        xbmcplugin.setContent(ADDON_HANDLE, "songs")
         request_str = "playlists tracks 0 100000 tags:%s playlist_id:%s" % (TAGS_BASIC, playlistid)
         result = self.lmsserver.send_request(request_str)
         if result:
             result = self.lmsserver.process_trackdetails(result["playlisttracks_loop"])
             result = [self.create_track_listitem(item) for item in result]
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def currentplaylist(self):
         '''get the current playlist loaded in the player'''
         playlistid = self.params.get("playlistid")
-        xbmcplugin.setContent(int(sys.argv[1]), "songs")
+        xbmcplugin.setContent(ADDON_HANDLE, "songs")
         result = self.lmsserver.cur_playlist(True)
         if result:
             result = [self.create_track_listitem(item) for item in result]
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
     
     def playlists(self):
         '''get playlists from server'''
-        xbmcplugin.setContent(int(sys.argv[1]), "files")
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(136))
         params = self.params.get("params")
         request_str = "playlists 0 100000 tags:%s" %TAGS_FULL
         if params:
@@ -139,11 +151,13 @@ class PluginContent:
             for item in result.get("playlists_loop"):
                 cmd = "playlisttracks&playlistid=%s" % item["id"]
                 self.create_generic_listitem(item["playlist"], "DefaultMusicPlaylists.png", cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def genres(self):
         '''get genres from server'''
-        xbmcplugin.setContent(int(sys.argv[1]), "files")
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(135))
         params = self.params.get("params")
         request_str = "genres 0 100000 tags:%s" % TAGS_FULL
         if params:
@@ -153,12 +167,24 @@ class PluginContent:
             for item in result.get("genres_loop"):
                 cmd = "tracks&params=genre_id:%s" % item["id"]
                 thumb = self.lmsserver.get_thumb(item)
-                self.create_generic_listitem(item["genre"], thumb, cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+                contextmenu = []
+                params = quote_plus("playlist loadalbum %s * *" % item["genre"])
+                contextmenu.append((self.addon.getLocalizedString(32203),
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+                params = quote_plus("playlist insertalbum %s * *" % item["genre"])
+                contextmenu.append((self.addon.getLocalizedString(32204), 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+                params = quote_plus("playlist addalbum %s * *" % item["genre"])
+                contextmenu.append((self.addon.getLocalizedString(32205), 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+                self.create_generic_listitem(item["genre"], thumb, cmd, True, contextmenu)
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def years(self):
         '''get years from server'''
-        xbmcplugin.setContent(int(sys.argv[1]), "files")
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(652))
         params = self.params.get("params")
         request_str = "years 0 100000 tags:%s" %TAGS_FULL
         if params:
@@ -169,11 +195,13 @@ class PluginContent:
                 cmd = "albums&params=year:%s" % item["year"]
                 thumb = self.lmsserver.get_thumb(item)
                 self.create_generic_listitem("%s" % item["year"], thumb, cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def musicfolder(self):
         '''explore musicfolder on the server'''
-        xbmcplugin.setContent(int(sys.argv[1]), "files")
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(744))
         params = self.params.get("params")
         request_str = "musicfolder 0 100000 tags:%s" %TAGS_FULL
         if params:
@@ -191,11 +219,13 @@ class PluginContent:
                 else:
                     cmd = "musicfolder&params=folder_id:%s" % item["id"]
                     self.create_generic_listitem("%s" % item["filename"], thumb, cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def favorites(self):
         '''get favorites from server'''
-        xbmcplugin.setContent(int(sys.argv[1]), "files")
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(1036))
         request_str = "favorites items 0 100000 want_url:1 tags:%s" %TAGS_FULL
         params = self.params.get("params")
         if params:
@@ -214,7 +244,8 @@ class PluginContent:
                 else:
                     cmd = "favorites&params=item_id:%s" % item["id"]
                     self.create_generic_listitem(item["name"], thumb, cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def get_menu(self, node):
         '''grabs the menu for this player'''
@@ -231,11 +262,11 @@ class PluginContent:
                     # library nodes
                     if "browselibrary" in item["actions"]["go"]["cmd"]:
                         action = item["actions"]["go"]["params"]["mode"]
-                        if "albums" in action:
+                        if "albums" in action.lower():
                             action = "albums"
-                        elif "tracks" in action:
+                        elif "tracks" in action.lower():
                             action = "tracks"
-                        elif "artists" in action:
+                        elif "artists" in action.lower():
                             action = "artists"
                         elif "bmf" in action:
                             action = "musicfolder"
@@ -255,7 +286,7 @@ class PluginContent:
                     elif "myapps" in item["actions"]["go"]["cmd"]:
                         actionstr = "apps"
                     elif "appgallery" in item["actions"]["go"]["cmd"]:
-                        actionstr = "appgallery"
+                        continue # do not show app gallery directly on homescreen
                     elif "favorites" in item["actions"]["go"]["cmd"]:
                         actionstr = "favorites"
                     else:
@@ -287,16 +318,19 @@ class PluginContent:
             if result:
                 count = int(result["_tracks"])
                 if count > 0:
-                    self.create_generic_listitem("Current Playlist", "", "currentplaylist")
+                    self.create_generic_listitem(xbmc.getLocalizedString(13350), "", "currentplaylist")
         for item in self.get_menu(node):
             thumb = self.lmsserver.get_thumb(item)
             self.create_generic_listitem(item["label"], thumb, item["cmd"])
         # show sync settings in menu
         if node == "home":
-            self.create_generic_listitem("Synchroniseren", "", "syncsettings")
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+            self.create_generic_listitem(self.addon.getLocalizedString(32206), "", "syncsettings")
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def search(self):
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(19140))
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
         kb = xbmc.Keyboard('', xbmc.getLocalizedString(16017))
         kb.doModal()
         if kb.isConfirmed():
@@ -323,9 +357,12 @@ class PluginContent:
                     label = "Genres (%s)" % result["genres_count"]
                     cmd = "genres&params=search:%s" % searchterm
                     self.create_generic_listitem(label, "DefaultMusicGenres.png", cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def globalsearch(self):
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(19140))
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
         kb = xbmc.Keyboard('', xbmc.getLocalizedString(16017))
         kb.doModal()
         if kb.isConfirmed():
@@ -335,27 +372,13 @@ class PluginContent:
                 params = "globalsearch items 0 100 item_id:%s" % item["id"]
                 cmd = "browse&params=%s" % quote_plus(params)
                 self.create_generic_listitem(item["name"], "DefaultMusicSearch.png", cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def apps(self):
         '''get apps from server'''
         self.params["params"] = "myapps items 0 100000"
         self.browse()
-
-    def appgallery(self):
-        '''browse appgallery'''
-        result = self.lmsserver.send_request("appgallery items 0 100000")
-        if result:
-            for item in result["loop_loop"]:
-                thumb = self.lmsserver.get_thumb(item)
-                if "id" in item:
-                    item_id = item["id"]
-                else:
-                    item_id = item["actions"]["go"]["params"]["item_id"]
-                params = "appgallery items 0 100000 item_id:%s" % item_id
-                cmd = "browse&params=%s" % quote_plus(params)
-                self.create_generic_listitem(item["name"], thumb, cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
 
     def get_redirect(self, appname):
         '''workaround to get app command redirects'''
@@ -371,8 +394,7 @@ class PluginContent:
         '''browse generic (app/radio) listing'''
         request_str = self.params.get("params")
         contenttype = self.params.get("contenttype", "files")
-
-        xbmcplugin.setContent(int(sys.argv[1]), contenttype)
+        xbmcplugin.setContent(ADDON_HANDLE, contenttype)
         if "__TAGGEDINPUT__" in request_str:
             kb = xbmc.Keyboard('', xbmc.getLocalizedString(16017))
             kb.doModal()
@@ -418,20 +440,20 @@ class PluginContent:
                 # playable item
                 contextmenu = []
                 params = quote_plus("%s playlist play item_id:%s" % (app, item["id"]))
-                contextmenu.append(("Play now", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+                contextmenu.append((self.addon.getLocalizedString(32203), 
+                        "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
                 params = quote_plus("%s playlist insert item_id:%s" % (app, item["id"]))
-                contextmenu.append(("Play next", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+                contextmenu.append((self.addon.getLocalizedString(32204), 
+                        "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
                 params = quote_plus("%s playlist add item_id:%s" % (app, item["id"]))
-                contextmenu.append(("Insert at end", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
-
-                if itemtype == "playlist":
+                contextmenu.append((self.addon.getLocalizedString(32205), 
+                        "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+                if itemtype in ["playlist", "link"]:
                     params = quote_plus("%s items 0 100000 item_id:%s" % (app, item["id"]))
                     contextmenu.append(
                         ("Browse", "Container.Update(%s?action=browse&params=%s)" %
                          (PLUGIN_BASE, params)))
-                    cmd = "%s playlist play item_id:%s" % (app, item["id"])
-                else:
-                    cmd = "%s playlist add item_id:%s" % (app, item["id"])
+                cmd = "%s playlist play item_id:%s" % (app, item["id"])
                 cmd = "command&params=%s" % quote_plus(cmd)
                 self.create_generic_listitem(item["name"], thumb, cmd, False, contextmenu)
             else:
@@ -451,31 +473,52 @@ class PluginContent:
                     continue
                 cmd = "browse&params=%s&contentttype=%s" % (params, contentttype)
                 self.create_generic_listitem(item["name"], thumb, cmd)
-
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def syncsettings(self):
-        '''sync settings'''
-        xbmcplugin.setContent(int(sys.argv[1]), "files")
-        result = self.lmsserver.send_request("syncsettings 0 100")
-        for item in result["item_loop"]:
-            if "actions" in item:
-                # player entry
-                syncwith = item["actions"]["do"]["params"]["syncWith"]
-                unsyncwith = item["actions"]["do"]["params"]["unsyncWith"]
-                label = item["text"]
-                if unsyncwith != 0 and not syncwith == 0:
-                    label += " [SYNC]"
-                actionstr = "jivesync syncWith:%s unsyncWith:%s" %(syncwith, unsyncwith)
-                cmd = "command&params=%s&refresh=true" % quote_plus(actionstr)
-                self.create_generic_listitem(label, "", cmd, False)
-            else:
-                # header with no action
-                self.create_generic_listitem(item["text"], "", "syncsettings")
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        '''sync settings (The synchroniser plugin)'''
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
+        result = self.lmsserver.send_request("syncTop")
+        if result and "item_loop" in result and result["item_loop"]:
+            # The synchroniser plugin present
+            # sync all to this player
+            cmd = "command&params=syncSyncToMe&refresh=true"
+            self.create_generic_listitem(self.addon.getLocalizedString(32207), "", cmd, False)
+            # sync groups    
+            for item in result["item_loop"]:
+                log_msg(item)
+                if "syncSyncToSet" in item["actions"]["do"]["params"]["menu"]:
+                    cmd = quote_plus("syncSyncToSet set:%s" % item["actions"]["do"]["params"]["set"])
+                    cmd = "command&params=%s" % cmd
+                    self.create_generic_listitem(item["text"], "", cmd, False)
+            # desync all
+            cmd = "command&params=syncUnsync&refresh=true"
+            self.create_generic_listitem(self.addon.getLocalizedString(32208), "", cmd, False)
+        else:
+            # fall back to legacy LMS method to set syncing....
+            result = self.lmsserver.send_request("syncsettings 0 100")
+            for item in result["item_loop"]:
+                if "actions" in item:
+                    # player entry
+                    syncwith = item["actions"]["do"]["params"]["syncWith"]
+                    unsyncwith = item["actions"]["do"]["params"]["unsyncWith"]
+                    label = item["text"]
+                    if unsyncwith != 0 and not syncwith == 0:
+                        label += " [SYNC]"
+                    actionstr = "jivesync syncWith:%s unsyncWith:%s" %(syncwith, unsyncwith)
+                    cmd = "command&params=%s&refresh=true" % quote_plus(actionstr)
+                    self.create_generic_listitem(label, "", cmd, False)
+                else:
+                    # header with no action
+                    self.create_generic_listitem(item["text"], "", "syncsettings")
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def radios(self):
         '''get radio items'''
+        xbmcplugin.setProperty(ADDON_HANDLE,'FolderName', xbmc.getLocalizedString(19183))
+        xbmcplugin.setContent(ADDON_HANDLE, "files")
         request_str = "radios 0 100000 tags:%s" %TAGS_FULL
         result = self.lmsserver.send_request(request_str)
         if result:
@@ -487,7 +530,8 @@ class PluginContent:
                 cmd = "browse&params=%s" % quote_plus(params)
                 thumb = self.lmsserver.get_thumb(item)
                 self.create_generic_listitem(item["name"], thumb, cmd)
-        xbmcplugin.endOfDirectory(handle=int(sys.argv[1]))
+        xbmcplugin.addSortMethod(ADDON_HANDLE, xbmcplugin.SORT_METHOD_UNSORTED)
+        xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
 
     def get_app_contenttype(self, item):
         '''try to parse the contenttype from the details'''
@@ -521,7 +565,7 @@ class PluginContent:
                              'rating': lms_item.get("rating"),
                              'genre': lms_item.get("genre"),
                              'year': lms_item.get("year"),
-                             'mediatype': lms_item.get("artist")
+                             'mediatype': "artist"
                          })
         listitem.setArt({"thumb": thumb})
         listitem.setIconImage(thumb)
@@ -529,9 +573,18 @@ class PluginContent:
         listitem.setProperty("DBYPE", "artist")
         # contextmenu
         contextmenu = []
+        params = quote_plus("playlist loadalbum * %s *" % item["genre"])
+        contextmenu.append((self.addon.getLocalizedString(32203),
+            "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+        params = quote_plus("playlist insertalbum * %s *" % item["genre"])
+        contextmenu.append((self.addon.getLocalizedString(32204), 
+            "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+        params = quote_plus("playlist addalbum * %s *" % item["genre"])
+        contextmenu.append((self.addon.getLocalizedString(32205), 
+            "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
         listitem.addContextMenuItems(contextmenu, True)
         url = "plugin://plugin.audio.squeezebox?action=albums&params=artist_id:%s" % lms_item.get("id")
-        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE,
                                     url=url, listitem=listitem, isFolder=True)
 
     def get_songinfo(self, url):
@@ -574,11 +627,14 @@ class PluginContent:
                 (special_char, lms_item["artist"].replace(
                     " ", "[SP]"), lms_item["album"].replace(
                     " ", "[SP]")))
-            contextmenu.append(("Play album", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((self.addon.getLocalizedString(32201), 
+                "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((self.addon.getLocalizedString(32202), 
+                "Container.Update(%s)" % url))
         except:
             pass
         listitem.addContextMenuItems(contextmenu, True)
-        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE,
                                     url=url, listitem=listitem, isFolder=True)
 
     def create_track_listitem(self, lms_item):
@@ -596,7 +652,8 @@ class PluginContent:
                              'tracknumber': lms_item.get("track_number"),
                              'lyrics': lms_item.get("lyrics"),
                              'year': lms_item.get("year"),
-                             'comment': lms_item.get("comment")
+                             'comment': lms_item.get("comment"),
+                             "mediatype": "song"
                          })
         listitem.setArt({"thumb": lms_item["thumb"]})
         listitem.setIconImage(lms_item["thumb"])
@@ -612,27 +669,36 @@ class PluginContent:
             pl_pos = int(self.lmsserver.cur_index)
             cmd = quote_plus("playlist index %s" % pl_index)
             params = quote_plus("playlist index %s" % pl_index)
-            contextmenu.append(("Play now", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
-            contextmenu.append(("Play Next", "RunPlugin(%s?action=playlistplaynext&params=%s)" % (PLUGIN_BASE, pl_index)))
+            contextmenu.append((self.addon.getLocalizedString(32203), 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((self.addon.getLocalizedString(32204), 
+                    "RunPlugin(%s?action=playlistplaynext&params=%s)" % (PLUGIN_BASE, pl_index)))
             params = quote_plus("playlist move %s +1" % pl_index)
-            contextmenu.append(("Move up", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((xbmc.getLocalizedString(13332), 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
             params = quote_plus("playlist move %s -1" % pl_index)
-            contextmenu.append(("Move down", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((xbmc.getLocalizedString(13333), 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
             params = quote_plus("playlist delete %s" % pl_index)
-            contextmenu.append(("Delete", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
-            params = quote_plus("playlist clear")
-            contextmenu.append(("Clear playlist", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((xbmc.getLocalizedString(117), 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            params = quote_plus(xbmc.getLocalizedString(192))
+            contextmenu.append(("Clear playlist", 
+                    "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
         else:
             # normal contextmenu
             params = quote_plus("playlist play %s" % lms_item["url"])
-            contextmenu.append(("Play now", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((self.addon.getLocalizedString(32203),
+                "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
             params = quote_plus("playlist insert %s" % lms_item["url"])
-            contextmenu.append(("Play next", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((self.addon.getLocalizedString(32204), 
+                "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
             params = quote_plus("playlist add %s" % lms_item["url"])
-            contextmenu.append(("Insert at end", "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
+            contextmenu.append((self.addon.getLocalizedString(32205), 
+                "RunPlugin(%s?action=command&params=%s)" % (PLUGIN_BASE, params)))
         listitem.addContextMenuItems(contextmenu, True)
         url = "plugin://plugin.audio.squeezebox?action=command&params=%s" % cmd
-        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE,
                                     url=url, listitem=listitem, isFolder=False)
 
     def create_generic_listitem(self, label, icon, cmd, is_folder=True, contextmenu=None):
@@ -641,7 +707,8 @@ class PluginContent:
         if not contextmenu:
             contextmenu = []
         listitem.addContextMenuItems(contextmenu, True)
-        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),
+        listitem.setProperty("isPlayable", "false")
+        xbmcplugin.addDirectoryItem(handle=ADDON_HANDLE,
                                     url=url, listitem=listitem, isFolder=is_folder)
 
     def playlistplaynext(self):
@@ -661,4 +728,3 @@ class PluginContent:
         self.lmsserver.send_request(cmd)
         if refresh:
             xbmc.executebuiltin("Container.Refresh")
-        #xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=True, listitem=xbmcgui.ListItem())

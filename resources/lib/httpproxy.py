@@ -87,7 +87,7 @@ class Track:
 
         return file.getvalue(), all_cunks_size + 8
 
-    def send_audio_stream(self, filesize, wave_header=None, max_buffer_size=65535):
+    def send_audio_stream(self, filesize, wave_header=None, max_buffer_size=8196):
 
         # Initialize some loop vars
         output_buffer = StringIO.StringIO()
@@ -213,7 +213,7 @@ class ProxyRunner(threading.Thread):
         list_str = ','.join([str(item) for item in port_list])
         raise HTTPProxyError("Cannot find a free port. Tried: %s" % list_str)
 
-    def __init__(self, host='localhost', try_ports=range(8190, 8200), allowed_ips=['127.0.0.1'], allow_ranges=True):
+    def __init__(self, host='localhost', try_ports=range(51100, 51150), allowed_ips=['127.0.0.1'], allow_ranges=True):
         port = self._find_free_port(host, try_ports)
         self.__allowed_ips = allowed_ips
         self.__root = Root(

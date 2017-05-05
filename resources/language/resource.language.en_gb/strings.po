@@ -1,6 +1,6 @@
 # Kodi language file
-# Addon Name: Skin Helper Service
-# Addon id: script.skin.helper.service
+# Addon Name: Squeezebox player for Kodi
+# Addon id: plugin.audio.squeezebox
 # Addon Provider: marcelveldt
 msgid ""
 msgstr ""
@@ -17,109 +17,103 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
 
 msgctxt "#32000"
-msgid "Custom Image"
+msgid "Squeezelite"
 msgstr ""
 
 msgctxt "#32001"
-msgid "None"
+msgid "Do not auto start squeezelite"
 msgstr ""
 
 msgctxt "#32002"
-msgid "Background overlay texture"
+msgid "Manual path to squeezelite executable"
 msgstr ""
 
 msgctxt "#32003"
-msgid "Browse custom image for background overlay"
+msgid "On Android en IOS, squeezelite is not supported"
 msgstr ""
 
 msgctxt "#32004"
-msgid "Custom single image"
+msgid "Install a Squeezeplayer app from the appstore"
 msgstr ""
 
 msgctxt "#32005"
-msgid "Custom multi image (folder)"
+msgid "For Android, a good choice is SB Player"
 msgstr ""
 
 msgctxt "#32006"
-msgid "Select busy spinner"
+msgid "On iOS, the iPeng app is a good choice"
 msgstr ""
 
 msgctxt "#32007"
-msgid "%s missing!"
+msgid "By default, this addon will try to start squeezelite in the background for you"
 msgstr ""
 
 msgctxt "#32008"
-msgid "To get the most out of this skin, it is suggested to install a image resource addon for %s. \n Do you want to select and install this image resource addon now ?"
+msgid "You can override this behaviour if you already have squeezelite running in the background"
 msgstr ""
 
 msgctxt "#32009"
-msgid "Custom path"
+msgid "It is also possible to provide your own path to the squeezelite binary"
 msgstr ""
 
 msgctxt "#32010"
-msgid "Select resource addon or custom folder"
+msgid "Specify MAC-address of player manually"
 msgstr ""
 
 msgctxt "#32011"
-msgid "Not installed"
+msgid "Define MAC-address (lowercase only!)"
 msgstr ""
 
-msgctxt "#32012"
-msgid "Select view"
+msgctxt "#32100"
+msgid "LMS Server"
 msgstr ""
 
-msgctxt "#32013"
-msgid "Enable/disable views"
+msgctxt "#32101"
+msgid "Do not autodiscover LMS server"
 msgstr ""
 
-msgctxt "#32014"
-msgid "The action completed sucesfully"
+msgctxt "#32102"
+msgid "LMS server hostname"
 msgstr ""
 
-msgctxt "#32015"
-msgid "The action completed with errors"
+msgctxt "#32103"
+msgid "LMS server web port"
 msgstr ""
 
-msgctxt "#32016"
-msgid "Do you want to setup a single background or a folder with multiple backgrounds ?"
+
+
+msgctxt "#32201"
+msgid "Play album"
 msgstr ""
 
-msgctxt "#32017"
-msgid "Single"
+msgctxt "#32202"
+msgid "Browse album"
 msgstr ""
 
-msgctxt "#32018"
-msgid "Multiple"
+msgctxt "#32203"
+msgid "Play now"
 msgstr ""
 
-msgctxt "#32019"
-msgid "Random fanart from movie with genre"
+msgctxt "#32204"
+msgid "Play next"
 msgstr ""
 
-msgctxt "#32020"
-msgid "Select image"
+msgctxt "#32205"
+msgid "Add to current playlist"
 msgstr ""
 
-msgctxt "#32021"
-msgid "Available image resource addons"
+msgctxt "#32206"
+msgid "Synchronize"
 msgstr ""
 
-msgctxt "#32022"
-msgid "There are no (more) resource addons available for this type"
+msgctxt "#32207"
+msgid "Synchronize all players to this player"
 msgstr ""
 
-msgctxt "#32023"
-msgid "Artwork options"
+msgctxt "#32208"
+msgid "Un-sync all players"
 msgstr ""
 
-msgctxt "#32024"
-msgid "Select Animated Art"
-msgstr ""
 
-msgctxt "#32025"
-msgid "Use submenu as widget"
-msgstr ""
 
-msgctxt "#32025"
-msgid "RCB Most played games"
-msgstr ""
+
