@@ -213,7 +213,7 @@ class ProxyRunner(threading.Thread):
         list_str = ','.join([str(item) for item in port_list])
         raise HTTPProxyError("Cannot find a free port. Tried: %s" % list_str)
 
-    def __init__(self, host='localhost', try_ports=range(8090, 8100), allowed_ips=['127.0.0.1'], allow_ranges=True):
+    def __init__(self, host='localhost', try_ports=range(8190, 8200), allowed_ips=['127.0.0.1'], allow_ranges=True):
         port = self._find_free_port(host, try_ports)
         self.__allowed_ips = allowed_ips
         self.__root = Root(

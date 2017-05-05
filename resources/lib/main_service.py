@@ -170,7 +170,7 @@ class MainService:
         if sl_binary:
             sl_output = self.get_audiodevice(sl_binary)
             log_msg("Starting Squeezelite binary - Using audio device: %s" %sl_output)
-            args = [sl_binary, "-s", lmsserver.host, "-C", "2", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
+            args = [sl_binary, "-s", lmsserver.host, "-C", "1", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
@@ -194,8 +194,7 @@ class MainService:
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "win32", "squeezelite-win.exe")
         elif xbmc.getCondVisibility("System.Platform.OSX"):
             sl_binary = os.path.join(os.path.dirname(__file__), "bin", "osx", "squeezelite")
-            import stat
-            os.chmod(sl_binary, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+            os.system("chmod a+x %s" %sl_binary)
         elif xbmcvfs.exists("/storage/.kodi/addons/virtual.multimedia-tools/bin/squeezelite"):
             sl_binary = "/storage/.kodi/addons/virtual.multimedia-tools/bin/squeezelite"
         elif xbmc.getCondVisibility("System.Platform.Linux.RaspberryPi"):
