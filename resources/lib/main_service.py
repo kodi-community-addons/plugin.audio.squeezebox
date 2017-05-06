@@ -185,7 +185,7 @@ class MainService:
             if sl_binary:
                 sl_output = self.get_audiodevice(sl_binary)
                 log_msg("Starting Squeezelite binary - Using audio device: %s" %sl_output)
-                args = [sl_binary, "-s", lmsserver.host, "-C", "1", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
+                args = [sl_binary, "-s", lmsserver.host, "-a", "80", "-C", "1", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
                 startupinfo = None
                 if os.name == 'nt':
                     startupinfo = subprocess.STARTUPINFO()
