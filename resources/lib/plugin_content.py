@@ -487,7 +487,6 @@ class PluginContent:
             self.create_generic_listitem(self.addon.getLocalizedString(32207), "", cmd, False)
             # sync groups    
             for item in result["item_loop"]:
-                log_msg(item)
                 if "syncSyncToSet" in item["actions"]["do"]["params"]["menu"]:
                     cmd = quote_plus("syncSyncToSet set:%s" % item["actions"]["do"]["params"]["set"])
                     cmd = "command&params=%s" % cmd

@@ -148,7 +148,8 @@ class Track:
         # headers
         if is_radio:
             cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
-            cherrypy.response.headers['Connection'] = 'chunked'
+            cherrypy.response.headers['Connection'] = 'close'
+            #cherrypy.response.headers['Transfer-Encoding'] = 'chunked'
         elif cherrypy.request.headers.get('Range', '') == "bytes=0-":
             cherrypy.response.status = '206 Partial Content'
             cherrypy.response.headers['Content-Type'] = 'audio/x-wav'
