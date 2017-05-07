@@ -65,5 +65,6 @@ Thanks!
 https://github.com/marcelveldt/repository.marcelveldt/raw/master/repository.marcelveldt/repository.marcelveldt-1.0.1.zip
 
 
-
+**Supportthread on kodi forums:**
+http://forum.kodi.tv/showthread.php?tid=313912
 
