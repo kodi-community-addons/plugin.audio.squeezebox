@@ -21,6 +21,7 @@ import sys
 import xbmcvfs
 import stat
 
+
 class MainService:
     '''our main background service running the various threads'''
     sl_exec = None
@@ -79,6 +80,9 @@ class MainService:
             # initialize kodi player monitor
             kodiplayer = KodiPlayer(lmsserver=lmsserver, webport=webport)
 
+            # report player as awake
+            lmsserver.send_command("power 1")
+
             # mainloop
             while not kodimonitor.abortRequested():
                 # monitor the LMS state changes
@@ -88,12 +92,14 @@ class MainService:
 
         # Abort was requested while waiting. We should exit
         log_msg('Shutdown requested !', xbmc.LOGNOTICE)
+        lmsserver.send_command("power 0")  # report player as powered off
+        xbmc.sleep(250)
         win.setProperty("lmsexit", "true")
-        kodiplayer.close()
 
         # stop the extra threads and cleanup
         self.stop_squeezelite()
         proxy_runner.stop()
+        kodiplayer.close()
         proxy_runner = None
         del win
         del kodimonitor
@@ -124,14 +130,14 @@ class MainService:
                 kodiplayer.update_playlist()
                 if kodiplayer.is_playing:
                     kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
-            
+
             elif not kodiplayer.is_playing and lmsserver.mode == "play":
                     # playback started
-                    log_msg("play started by lms server")
-                    if not len(kodiplayer.playlist):
-                        kodiplayer.update_playlist()
-                    kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
-            
+                log_msg("play started by lms server")
+                if not len(kodiplayer.playlist):
+                    kodiplayer.update_playlist()
+                kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
+
             elif kodiplayer.is_playing:
                 # monitor some conditions if the player is playing
                 if kodiplayer.is_playing and lmsserver.mode == "stop":
@@ -176,7 +182,7 @@ class MainService:
                             kodiplayer.seekTime(cur_time_lms)
                             xbmc.sleep(250)
                             kodiplayer.is_busy = False
-                
+
     def start_squeezelite(self, lmsserver):
         '''On supported platforms we include squeezelite binary'''
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
@@ -184,8 +190,10 @@ class MainService:
             sl_binary = self.get_squeezelite_binary()
             if sl_binary:
                 sl_output = self.get_audiodevice(sl_binary)
-                log_msg("Starting Squeezelite binary - Using audio device: %s" %sl_output)
-                args = [sl_binary, "-s", lmsserver.host, "-a", "80", "-C", "1", "-m", lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
+                self.kill_squeezelite()
+                log_msg("Starting Squeezelite binary - Using audio device: %s" % sl_output)
+                args = [sl_binary, "-s", lmsserver.host, "-a", "80", "-C", "1", "-m",
+                        lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
                 startupinfo = None
                 if os.name == 'nt':
                     startupinfo = subprocess.STARTUPINFO()
@@ -229,14 +237,28 @@ class MainService:
         else:
             log_msg("Unsupported platform! - for iOS and Android you need to install a squeezeplayer app yourself and make sure it's running in the background.")
         return sl_binary
-        
+
+    @staticmethod
+    def kill_squeezelite():
+        '''make sure we don't have any (remaining) squeezelite processes running before we start one'''
+        if xbmc.getCondVisibility("System.Platform.Windows"):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
+            subprocess.Popen(["taskkill", "/IM", "squeezelite-win.exe"], startupinfo=startupinfo, shell=True)
+            subprocess.Popen(["taskkill", "/IM", "squeezelite.exe"], startupinfo=startupinfo, shell=True)
+        else:
+            os.system("killall squeezelite")
+            os.system("killall squeezelite-i64")
+            os.system("killall squeezelite-x86")
+        xbmc.sleep(2000)
+
     @staticmethod
     def get_audiodevice(sl_binary):
         # guess the audio device to use
         # todo: make user configurable ?
         args = [sl_binary, "-l"]
         startupinfo = None
-        if os.name == 'nt':
+        if xbmc.getCondVisibility("System.Platform.Windows"):
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
         sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
@@ -244,7 +266,6 @@ class MainService:
         for line in stdout.splitlines():
             line = line.strip().split(" ")[0]
             if "default" in line:
-                log_msg("Using audio device: %s" %line)
+                log_msg("Using audio device: %s" % line)
                 return line
         return "default"
-        

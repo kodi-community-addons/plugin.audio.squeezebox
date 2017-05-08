@@ -33,7 +33,6 @@ except Exception:
     SUPPORTS_POOL = False
 
 
-
 def log_msg(msg, loglevel=xbmc.LOGNOTICE):
     '''log message to kodi log'''
     if isinstance(msg, unicode):
@@ -62,6 +61,7 @@ def get_mac():
         log_msg("Detected Mac-Address: %s" % mac)
     return mac
 
+
 def process_method_on_list(method_to_run, items):
     '''helper method that processes a method on each listitem with pooling if the system supports it'''
     all_items = []
@@ -79,3 +79,21 @@ def process_method_on_list(method_to_run, items):
         all_items = [method_to_run(item) for item in items]
     all_items = filter(None, all_items)
     return all_items
+
+
+def parse_duration(durationobj):
+    '''
+        lms is a mess with typing,
+        I've seen the duration being returned as string, float and int
+        This will try to parse the result from LMS into a int
+    '''
+    result = 0
+    try:
+        result = int(durationobj)
+    except ValueError:
+        try:
+            result = float(durationobj)
+            result = int(result)
+        except ValueError:
+            log_exception(__name__, "Error parsing track duration")
+    return result

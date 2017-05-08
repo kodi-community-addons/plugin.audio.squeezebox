@@ -18,7 +18,8 @@ import re
 from simplecache import SimpleCache
 
 TAGS_FULL = "aAcCdegGijJKlostuxyRwk"  # full track/album details
-TAGS_BASIC = "acdgjKluNxy"  # basic track/album details for initial listings
+TAGS_BASIC = "acdgjKluNxy"  # basic track details for initial listings
+TAGS_ALBUM = "yjtiqwaal"
 
 
 class LMSServer:
@@ -257,6 +258,8 @@ class LMSServer:
             thumb = item["artwork_url"]
         elif item.get("artwork_track_id"):
             thumb = "music/%s/cover.png" % item["artwork_track_id"]
+        elif item.get("coverid"):
+            thumb = "music/%s/cover.png" % item["coverid"]
         elif item.get("album_id"):
             thumb = "imageproxy/mai/album/%s/image.png" % item["album_id"]
         elif item.get("artist_id"):
@@ -265,8 +268,6 @@ class LMSServer:
             thumb = "imageproxy/mai/album/%s/image.png" % item["id"]
         elif "artist" in item and "id" in item:
             thumb = "imageproxy/mai/artist/%s/image.png" % item["id"]
-        elif item.get("coverid"):
-            thumb = "music/%s/cover.png" % item["coverid"]
         elif "window" in item and "icon-id" in item["window"]:
             thumb = item["window"]["icon-id"]
 

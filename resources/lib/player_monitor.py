@@ -5,10 +5,10 @@
     plugin.audio.squeezebox
     Squeezelite Player for Kodi
     player_monitor.py
-    monitor both LMS and Kodi player
+    Kodi player and perform actions on LMS server
 '''
 
-from utils import log_msg, log_exception
+from utils import log_msg, log_exception, parse_duration
 import xbmc
 import xbmcgui
 from urllib import quote_plus
@@ -35,18 +35,18 @@ class KodiPlayer(xbmc.Player):
 
     def onPlayBackPaused(self):
         '''Kodi event fired when playback is paused'''
-        if self.isPlayingAudio() and self.lmsserver.mode == "play" and xbmc.getInfoLabel("MusicPlayer.getProperty(sl_path)"):
+        if self.is_playing and self.lmsserver.mode == "play":
             self.lmsserver.pause()
             log_msg("Playback paused")
 
     def onPlayBackResumed(self):
         '''Kodi event fired when playback is resumed after pause'''
-        if self.isPlayingAudio() and self.lmsserver.mode == "pause" and xbmc.getInfoLabel("MusicPlayer.getProperty(sl_path)"):
+        if self.is_playing and self.lmsserver.mode == "pause":
             self.lmsserver.unpause()
             log_msg("Playback unpaused")
 
     def onPlayBackEnded(self):
-        self.is_playing = False
+        pass
 
     def onPlayBackStarted(self):
         '''Kodi event fired when playback is started (including next tracks)'''
@@ -88,21 +88,21 @@ class KodiPlayer(xbmc.Player):
 
     def onPlayBackStopped(self):
         '''Kodi event fired when playback is stopped'''
-        if self.isPlayingAudio():
-            if self.lmsserver.mode == "play" or self.lmsserver.mode == "pause":
-                self.lmsserver.stop()
-                log_msg("playback stopped")
+        if self.is_playing:
+            self.lmsserver.stop()
+            log_msg("playback stopped")
         self.is_playing = False
 
     def create_listitem(self, lms_song):
         '''Create Kodi listitem from LMS song details'''
         listitem = xbmcgui.ListItem(lms_song["title"])
+        duration = parse_duration(lms_song.get("duration"))
         listitem.setInfo('music',
                          {
                              'title': lms_song["title"],
                              'artist': lms_song["trackartist"],
                              'album': lms_song.get("album"),
-                             'duration': lms_song.get("duration"),
+                             'duration': duration,
                              'discnumber': lms_song.get("disc"),
                              'rating': lms_song.get("rating"),
                              'genre': lms_song["genres"],
@@ -114,11 +114,11 @@ class KodiPlayer(xbmc.Player):
         listitem.setArt({"thumb": lms_song["thumb"]})
         listitem.setIconImage(lms_song["thumb"])
         listitem.setThumbnailImage(lms_song["thumb"])
-        if lms_song.get("remote_title") or not lms_song.get("duration") or lms_song.get("duration") == "0":
+        if lms_song.get("remote_title") or not duration:
             # workaround for radio streams
             file_name = "http://127.0.0.1:%s/track/radio" % (self.webport)
         else:
-            file_name = "http://127.0.0.1:%s/track/%s" % (self.webport, "%s" % int(lms_song.get("duration")))
+            file_name = "http://127.0.0.1:%s/track/%s" % (self.webport, "%s" % duration)
         listitem.setProperty("sl_path", lms_song["url"])
         listitem.setContentLookup(False)
         listitem.setProperty('do_not_analyze', 'true')
