@@ -34,6 +34,7 @@ class MainService:
         kodimonitor = xbmc.Monitor()
         win.clearProperty("lmsexit")
         self.addon = xbmcaddon.Addon(id=ADDON_ID)
+        kodiplayer = None
 
         # start the webservice (which hosts our silenced audio tracks)
         proxy_runner = ProxyRunner(host='127.0.0.1', allow_ranges=True)
@@ -57,8 +58,8 @@ class MainService:
         else:
             # auto discovery
             while not lmsserver and not kodimonitor.abortRequested():
-                log_msg("Waiting for LMS Server...")
                 servers = LMSDiscovery().all()
+                log_msg("discovery: %s" % servers)
                 if servers:
                     server = servers[0]  # for now, just use the first server discovered
                     lmshost = server.get("host")
@@ -87,19 +88,20 @@ class MainService:
             while not kodimonitor.abortRequested():
                 # monitor the LMS state changes
                 self.monitor_lms(kodiplayer, lmsserver)
-                # sleep for 1 seconds
+                # sleep for 1 second
                 kodimonitor.waitForAbort(1)
 
         # Abort was requested while waiting. We should exit
         log_msg('Shutdown requested !', xbmc.LOGNOTICE)
-        lmsserver.send_command("power 0")  # report player as powered off
-        xbmc.sleep(250)
         win.setProperty("lmsexit", "true")
-
+        if lmsserver:
+            lmsserver.send_command("power 0")  # report player as powered off
+            xbmc.sleep(250)
+            kodiplayer.close()
+        
         # stop the extra threads and cleanup
         self.stop_squeezelite()
         proxy_runner.stop()
-        kodiplayer.close()
         proxy_runner = None
         del win
         del kodimonitor
@@ -189,16 +191,19 @@ class MainService:
         if self.addon.getSetting("disable_auto_squeezelite") != "true":
             sl_binary = self.get_squeezelite_binary()
             if sl_binary:
-                sl_output = self.get_audiodevice(sl_binary)
-                self.kill_squeezelite()
-                log_msg("Starting Squeezelite binary - Using audio device: %s" % sl_output)
-                args = [sl_binary, "-s", lmsserver.host, "-a", "80", "-C", "1", "-m",
-                        lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
-                startupinfo = None
-                if os.name == 'nt':
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
-                self.sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT)
+                try:
+                    sl_output = self.get_audiodevice(sl_binary)
+                    self.kill_squeezelite()
+                    log_msg("Starting Squeezelite binary - Using audio device: %s" % sl_output)
+                    args = [sl_binary, "-s", lmsserver.host, "-a", "80", "-C", "1", "-m",
+                            lmsserver.playerid, "-n", playername, "-M", "Kodi", "-o", sl_output]
+                    startupinfo = None
+                    if os.name == 'nt':
+                        startupinfo = subprocess.STARTUPINFO()
+                        startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
+                    self.sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT)
+                except Exception as exc:
+                    log_exception(__name__, exc)
         if not self.sl_exec:
             log_msg("The Squeezelite binary was not automatically started, "
                     "you should make sure of starting it yourself, e.g. as a service.")

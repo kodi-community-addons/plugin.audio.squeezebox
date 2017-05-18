@@ -234,13 +234,13 @@ class LMSServer:
                 log_msg("Invalid or empty reponse from server - command: %s - server response: %s" %
                         (cmd, response.status_code))
         except Exception as exc:
+            log_exception(__name__, exc)
             if "Max retries exceeded" in str(exc) or "BadStatusLine" in str(exc):
-                log_msg("Server is offline...")
+                log_msg("Server is offline or connection error...")
+                log_msg("%s - %s - %s" %(result, str(exc), str(params)))
             elif "Connection aborted." in str(exc):
                 log_msg("Invalid or empty reponse from server - command: %s - server response: %s" %
                         (cmd, response.status_code))
-            else:
-                log_exception(__name__, exc)
 
         #log_msg("%s --> %s" %(params, result))
         return result
@@ -280,9 +280,6 @@ class LMSServer:
         return thumb
 
 
-DISCOVERY_PORT = 3483
-DEFAULT_DISCOVERY_TIMEOUT = 5
-
 
 class LMSDiscovery(object):
     """Class to discover Logitech Media Servers connected to your network."""
@@ -305,10 +302,10 @@ class LMSDiscovery(object):
     def update(self):
         """update the server netry with details"""
         lms_ip = '<broadcast>'
-        lms_port = DISCOVERY_PORT
+        lms_port = 3483
         # JSON tag has the port number, it's all we need here.
         lms_msg = "eJSON\0"
-        lms_timeout = DEFAULT_DISCOVERY_TIMEOUT
+        lms_timeout = 5
         entries = []
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
