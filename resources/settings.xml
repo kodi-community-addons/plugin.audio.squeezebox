@@ -3,6 +3,7 @@
     <category label="32000">
         <setting id="disable_auto_squeezelite" type="bool" label="32001" default="false" visible="!System.Platform.IOS + !System.Platform.Android"/>
         <setting id="squeezelite_path" type="folder" source="auto" label="32002" default="" visible="!System.Platform.IOS + !System.Platform.Android + !eq(-1,true)"/>
+        <setting id="output_device" type="action" action="RunPlugin(plugin://plugin.audio.squeezebox/?action=select_output)" label="32209" visible="!System.Platform.IOS + !System.Platform.Android + !eq(-2,true)"/>
         <setting label="32003" type="lsep" visible="System.Platform.IOS | System.Platform.Android"/>
         <setting label="32004" type="lsep" visible="System.Platform.IOS | System.Platform.Android"/>
         <setting label="32005" type="lsep" visible="System.Platform.Android"/>

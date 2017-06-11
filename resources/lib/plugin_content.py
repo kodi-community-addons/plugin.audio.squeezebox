@@ -38,12 +38,14 @@ class PluginContent:
         lmsplayerid = win.getProperty("lmsplayerid").decode("utf-8")
         lmshost = win.getProperty("lmshost").decode("utf-8")
         lmsport = win.getProperty("lmsport").decode("utf-8")
-
-        if not lmsplayerid:
+        
+        if "select_output" in sys.argv[2]:
+            self.select_output()
+        elif not lmsplayerid:
             log_msg("Service not yet ready - try again later!")
             xbmcplugin.endOfDirectory(handle=ADDON_HANDLE)
         else:
-
+            # show plugin listing
             self.lmsserver = LMSServer(lmshost, lmsport, lmsplayerid)
 
             # initialize plugin listing
@@ -724,3 +726,19 @@ class PluginContent:
         self.lmsserver.send_request(cmd)
         if refresh:
             xbmc.executebuiltin("Container.Refresh")
+            
+    def select_output(self):
+        '''helper to select the output device for squeezelite'''
+        xbmc.executebuiltin("ActivateWindow(busydialog")
+        from utils import get_audiodevices
+        devices = ["auto"]
+        devices += get_audiodevices()
+        xbmc.executebuiltin("Dialog.Close(busydialog)")
+        dialog = xbmcgui.Dialog()
+        ret = dialog.select("Detected audio devices", devices)
+        if ret != -1:
+            selected_device = devices[ret].split("-")[0].strip()
+            self.addon.setSetting("output_device", selected_device)
+            dialog.ok("restart required", "a restart is required to make the changes effective")
+        del dialog
+            

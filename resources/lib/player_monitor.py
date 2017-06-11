@@ -54,12 +54,11 @@ class KodiPlayer(xbmc.Player):
         if self.isPlayingVideo():
             # player is now playing video ! - disable the LMS player
             self.is_playing = False
-            self.lmsserver.send_command("power 0")
-            log_msg("Kodi started playing video - disabled the LMS player")
         else:
             self.wait_for_player()
             # set the is_playing bool to indicate we are playing LMS content
-            self.is_playing = xbmc.getCondVisibility("!IsEmpty(MusicPlayer.Property(sl_path))") == 1
+            
+            self.is_playing = xbmc.getInfoLabel("MusicPlayer.Property(sl_path)") != ""
             if self.is_playing and not self.lmsserver.state_changing:
                 if self.playlist.getposition() != self.lmsserver.cur_index:
                     # next song requested

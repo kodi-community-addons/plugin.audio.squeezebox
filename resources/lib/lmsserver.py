@@ -233,14 +233,8 @@ class LMSServer:
             else:
                 log_msg("Invalid or empty reponse from server - command: %s - server response: %s" %
                         (cmd, response.status_code))
-        except Exception as exc:
-            log_exception(__name__, exc)
-            if "Max retries exceeded" in str(exc) or "BadStatusLine" in str(exc):
-                log_msg("Server is offline or connection error...")
-                log_msg("%s - %s - %s" %(result, str(exc), str(params)))
-            elif "Connection aborted." in str(exc):
-                log_msg("Invalid or empty reponse from server - command: %s - server response: %s" %
-                        (cmd, response.status_code))
+        except Exception:
+            log_exception(__name__, "Server is offline or connection error...")
 
         #log_msg("%s --> %s" %(params, result))
         return result

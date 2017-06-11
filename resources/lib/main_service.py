@@ -8,7 +8,7 @@
     Background service which launches the squeezelite binary and monitors the player
 '''
 
-from utils import log_msg, ADDON_ID, log_exception, get_mac
+from utils import log_msg, ADDON_ID, log_exception, get_mac, get_squeezelite_binary, get_audiodevice
 from player_monitor import KodiPlayer
 from httpproxy import ProxyRunner
 from lmsserver import LMSServer, LMSDiscovery
@@ -117,22 +117,22 @@ class MainService:
         if not lmsserver.state_changing and not kodiplayer.is_busy:
 
             # monitor LMS player and server details
-            if (lmsserver.power == 1 or not self.temp_power_off) and xbmc.getCondVisibility("Player.HasVideo"):
+            if self.sl_exec and (lmsserver.power == 1 or not self.temp_power_off) and xbmc.getCondVisibility("Player.HasVideo"):
                 # turn off lms player when kodi is playing video
                 lmsserver.send_command("power 0")
                 self.temp_power_off = True
+                kodiplayer.is_playing = False
+                log_msg("Kodi started playing video - disabled the LMS player")
             elif self.temp_power_off and not xbmc.getCondVisibility("Player.HasVideo"):
                 # turn on player again when video playback was finished
                 lmsserver.send_command("power 1")
                 self.temp_power_off = False
-            elif self.prev_checksum != lmsserver.timestamp:
+            elif kodiplayer.is_playing and self.prev_checksum != lmsserver.timestamp:
                 # the playlist was modified
                 self.prev_checksum = lmsserver.timestamp
                 log_msg("playlist changed on lms server")
                 kodiplayer.update_playlist()
-                if kodiplayer.is_playing:
-                    kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
-
+                kodiplayer.play(kodiplayer.playlist, startpos=lmsserver.cur_index)
             elif not kodiplayer.is_playing and lmsserver.mode == "play":
                     # playback started
                 log_msg("play started by lms server")
@@ -189,10 +189,10 @@ class MainService:
         '''On supported platforms we include squeezelite binary'''
         playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
         if self.addon.getSetting("disable_auto_squeezelite") != "true":
-            sl_binary = self.get_squeezelite_binary()
+            sl_binary = get_squeezelite_binary()
             if sl_binary:
                 try:
-                    sl_output = self.get_audiodevice(sl_binary)
+                    sl_output = get_audiodevice(sl_binary)
                     self.kill_squeezelite()
                     log_msg("Starting Squeezelite binary - Using audio device: %s" % sl_output)
                     args = [sl_binary, "-s", lmsserver.host, "-a", "80", "-C", "1", "-m",
@@ -214,35 +214,6 @@ class MainService:
         if self.sl_exec:
             self.sl_exec.terminate()
 
-    def get_squeezelite_binary(self):
-        '''find the correct squeezelite binary belonging to the platform'''
-        sl_binary = ""
-        if self.addon.getSetting("squeezelite_path"):
-            sl_binary = self.addon.getSetting("squeezelite_path").decode("utf-8")
-        elif xbmc.getCondVisibility("System.Platform.Windows"):
-            sl_binary = os.path.join(os.path.dirname(__file__), "bin", "win32", "squeezelite-win.exe")
-        elif xbmc.getCondVisibility("System.Platform.OSX"):
-            sl_binary = os.path.join(os.path.dirname(__file__), "bin", "osx", "squeezelite")
-            st = os.stat(sl_binary)
-            os.chmod(sl_binary, st.st_mode | stat.S_IEXEC)
-        elif xbmcvfs.exists("/storage/.kodi/addons/virtual.multimedia-tools/bin/squeezelite"):
-            # libreelec has squeezelite preinstalled with the multimedia tools
-            sl_binary = "/storage/.kodi/addons/virtual.multimedia-tools/bin/squeezelite"
-        elif xbmc.getCondVisibility("System.Platform.Linux.RaspberryPi"):
-            sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-arm")
-            st = os.stat(sl_binary)
-            os.chmod(sl_binary, st.st_mode | stat.S_IEXEC)
-        elif xbmc.getCondVisibility("System.Platform.Linux"):
-            if sys.maxsize > 2**32:
-                sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-i64")
-            else:
-                sl_binary = os.path.join(os.path.dirname(__file__), "bin", "linux", "squeezelite-x86")
-            st = os.stat(sl_binary)
-            os.chmod(sl_binary, st.st_mode | stat.S_IEXEC)
-        else:
-            log_msg("Unsupported platform! - for iOS and Android you need to install a squeezeplayer app yourself and make sure it's running in the background.")
-        return sl_binary
-
     @staticmethod
     def kill_squeezelite():
         '''make sure we don't have any (remaining) squeezelite processes running before we start one'''
@@ -257,20 +228,3 @@ class MainService:
             os.system("killall squeezelite-x86")
         xbmc.sleep(2000)
 
-    @staticmethod
-    def get_audiodevice(sl_binary):
-        # guess the audio device to use
-        # todo: make user configurable ?
-        args = [sl_binary, "-l"]
-        startupinfo = None
-        if xbmc.getCondVisibility("System.Platform.Windows"):
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
-        sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        stdout, stderr = sl_exec.communicate()
-        for line in stdout.splitlines():
-            line = line.strip().split(" ")[0]
-            if "default" in line:
-                log_msg("Using audio device: %s" % line)
-                return line
-        return "default"
