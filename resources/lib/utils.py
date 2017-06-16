@@ -13,6 +13,7 @@ import xbmcvfs
 import xbmcaddon
 import subprocess
 import os
+import stat
 import sys
 import urllib
 from traceback import format_exc
