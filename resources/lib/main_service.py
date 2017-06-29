@@ -87,7 +87,9 @@ class MainService:
             # mainloop
             while not kodimonitor.abortRequested():
                 # monitor the LMS state changes
-                self.monitor_lms(kodiplayer, lmsserver)
+                if not (xbmc.getCondVisibility("System.Platform.Android") and playerid.lower() == get_mac().lower()):
+                    # TODO: implement fake OSD for android
+                    self.monitor_lms(kodiplayer, lmsserver)
                 # sleep for 1 second
                 kodimonitor.waitForAbort(1)
 
