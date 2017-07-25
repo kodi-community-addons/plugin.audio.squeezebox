@@ -53,11 +53,13 @@ def get_mac():
     '''helper to obtain the mac address of the kodi machine'''
     count = 0
     mac = ""
-    while ":" not in mac and count < 360:
+    monitor = xbmc.Monitor()
+    while ":" not in mac and count < 360 and not monitor.abortRequested():
         log_msg("Waiting for mac address...")
         mac = xbmc.getInfoLabel("Network.MacAddress").lower()
         count += 1
-        xbmc.sleep(1000)
+        monitor.waitForAbort(1)
+    del monitor
     if not mac:
         log_msg("Mac detection failed!")
     else:

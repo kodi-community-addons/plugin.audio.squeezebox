@@ -244,5 +244,5 @@ class ProxyRunner(threading.Thread):
 
     def stop(self):
         self.__server.stop()
-        self.join(10)
+        self.join(1)
         self.__root.cleanup()
