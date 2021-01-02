@@ -129,9 +129,11 @@ class KodiPlayer(xbmc.Player):
     def update_playlist(self):
         '''Update the playlist'''
         lmsplaylist = self.lmsserver.cur_playlist(True)
-        if len(self.playlist) > len(lmsplaylist):
-            log_msg("clearing playlist...")
-            self.playlist.clear()
+        log_msg("clearing playlist...") #
+        self.playlist.clear()           # Always clear playlist if requested, don't compare size
+#         if len(self.playlist) > len(lmsplaylist):
+#             log_msg("clearing playlist...")
+#             self.playlist.clear()
         for item in lmsplaylist:
             li, file_name = self.create_listitem(item)
             self.playlist.add(file_name, li, item["playlist index"])
