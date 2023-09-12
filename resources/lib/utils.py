@@ -36,16 +36,13 @@ except Exception:
     SUPPORTS_POOL = False
 
 
-def log_msg(msg, loglevel=xbmc.LOGNOTICE):
+def log_msg(msg, loglevel=xbmc.LOGINFO):
     '''log message to kodi log'''
-    if isinstance(msg, unicode):
-        msg = msg.encode('utf-8')
     xbmc.log("%s --> %s" % (ADDON_ID, msg), level=loglevel)
 
 
 def log_exception(modulename, exceptiondetails):
     '''helper to properly log an exception'''
-    log_msg(format_exc(sys.exc_info()), xbmc.LOGDEBUG)
     log_msg("Exception in %s ! --> %s" % (modulename, exceptiondetails), xbmc.LOGWARNING)
 
 
@@ -70,7 +67,7 @@ def get_squeezelite_binary():
     '''find the correct squeezelite binary belonging to the platform'''
     sl_binary = ""
     addon = xbmcaddon.Addon(id=ADDON_ID)
-    custom_path = addon.getSetting("squeezelite_path").decode("utf-8")
+    custom_path = addon.getSetting("squeezelite_path")
     del addon
     if custom_path:
         sl_binary = custom_path
@@ -110,8 +107,9 @@ def get_audiodevices(sl_binary=None):
         startupinfo.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
     sl_exec = subprocess.Popen(args, startupinfo=startupinfo, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
     stdout, stderr = sl_exec.communicate()
-    for line in stdout.split("\n"):
+    for line in stdout.splitlines():
         line = line.strip()
+        line = line.decode()
         if line and not "Output devices:" in line:
             result.append(line)
     return result
@@ -119,7 +117,7 @@ def get_audiodevices(sl_binary=None):
 def get_audiodevice(sl_binary):
     '''get the audiodevice to use for squeezelite'''
     addon = xbmcaddon.Addon(id=ADDON_ID)
-    user_device = addon.getSetting("output_device").decode("utf-8")
+    user_device = addon.getSetting("output_device")
     del addon
     if user_device and user_device != "auto":
         return user_device

@@ -115,10 +115,10 @@ Note that you have to explicitly set
 and not simply return an error message as a result.
 """
 
-from cgi import escape as _escape
 from sys import exc_info as _exc_info
 from traceback import format_exception as _format_exception
 
+import html
 import six
 
 from cherrypy._cpcompat import text_or_bytes, iteritems, ntob
@@ -492,7 +492,7 @@ def get_error_page(status, **kwargs):
         if v is None:
             kwargs[k] = ""
         else:
-            kwargs[k] = _escape(kwargs[k])
+            kwargs[k] = html.escape(kwargs[k])
 
     # Use a custom template or callable for the error page?
     pages = cherrypy.serving.request.error_page

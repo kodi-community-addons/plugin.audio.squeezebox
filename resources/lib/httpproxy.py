@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 import threading
 import time
-import StringIO
+from io import StringIO
 import re
 import struct
 import cherrypy
@@ -33,7 +33,7 @@ class Track:
 
     def _get_wave_header(self, duration):
         '''generate a wave header for our silence stream'''
-        file = StringIO.StringIO()
+        file = StringIO()
 
         # always add 2 seconds of additional duration to solve crossfade issues
         duration += 2
@@ -90,7 +90,7 @@ class Track:
     def send_audio_stream(self, filesize, wave_header=None, max_buffer_size=8196):
 
         # Initialize some loop vars
-        output_buffer = StringIO.StringIO()
+        output_buffer = StringIO()
         bytes_written = 0
         has_frames = True
 

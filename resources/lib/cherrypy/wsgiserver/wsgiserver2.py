@@ -2233,7 +2233,7 @@ class WSGIGateway_10(WSGIGateway):
             env["SERVER_PORT"] = str(req.server.bind_addr[1])
         
         # Request headers
-        for k, v in req.inheaders.iteritems():
+        for k, v in req.inheaders.items():
             env["HTTP_" + k.upper().replace("-", "_")] = v
         
         # CONTENT_TYPE/CONTENT_LENGTH
@@ -2261,7 +2261,7 @@ class WSGIGateway_u0(WSGIGateway_10):
         """Return a new environ dict targeting the given wsgi.version"""
         req = self.req
         env_10 = WSGIGateway_10.get_environ(self)
-        env = dict([(k.decode('ISO-8859-1'), v) for k, v in env_10.iteritems()])
+        env = dict([(k.decode('ISO-8859-1'), v) for k, v in env_10.items()])
         env[u'wsgi.version'] = ('u', 0)
         
         # Request-URI

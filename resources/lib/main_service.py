@@ -47,7 +47,7 @@ class MainService(threading.Thread):
 
         # get playerid based on mac address
         if self.addon.getSetting("disable_auto_mac") == "true" and self.addon.getSetting("manual_mac"):
-            playerid = self.addon.getSetting("manual_mac").decode("utf-8")
+            playerid = self.addon.getSetting("manual_mac")
         else:
             playerid = get_mac()
 
@@ -175,7 +175,7 @@ class MainService(threading.Thread):
                     self.kodiplayer.is_playing = False # it seems that xbmc.player calls the OnPlayBackStopped function if the play function is called while already playing.
                     log_msg("other track requested by lms server")
                     self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index)
-                elif self.lmsserver.status["title"] != xbmc.getInfoLabel("MusicPlayer.Title").decode("utf-8"):
+                elif self.lmsserver.status["title"] != xbmc.getInfoLabel("MusicPlayer.Title"):
                     # monitor if title still matches
                     log_msg("title mismatch - updating playlist...")
                     self.kodiplayer.update_playlist()
@@ -200,7 +200,7 @@ class MainService(threading.Thread):
 
     def start_squeezelite(self):
         '''On supported platforms we include squeezelite binary'''
-        playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
+        playername = xbmc.getInfoLabel("System.FriendlyName")
         if self.addon.getSetting("disable_auto_squeezelite") != "true":
             sl_binary = get_squeezelite_binary()
             if sl_binary and self.lmsserver:
