@@ -21,5 +21,8 @@
 		<forum></forum>
 		<website></website>
 		<source>https://github.com/marcelveldt/plugin.audio.squeezebox</source>
+		<assets>
+			<icon>icon.png</icon>
+		</assets>
 	</extension>
 </addon>
