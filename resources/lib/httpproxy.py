@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 import threading
 import time
-from io import StringIO
+from io import BytesIO
 import re
 import struct
 import cherrypy
@@ -33,7 +33,7 @@ class Track:
 
     def _get_wave_header(self, duration):
         '''generate a wave header for our silence stream'''
-        file = StringIO()
+        file = BytesIO()
 
         # always add 2 seconds of additional duration to solve crossfade issues
         duration += 2
@@ -46,13 +46,13 @@ class Track:
         format_chunk_spec = "<4sLHHLLHH"
         format_chunk = struct.pack(
             format_chunk_spec,
-            "fmt ",  # Chunk id
+            b"fmt ",  # Chunk id
             16,  # Size of this chunk (excluding chunk id and this field)
             1,  # Audio format, 1 for PCM
             channels,  # Number of channels
             samplerate,  # Samplerate, 44100, 48000, etc.
-            samplerate * channels * (bitspersample / 8),  # Byterate
-            channels * (bitspersample / 8),  # Blockalign
+            int(samplerate * channels * (bitspersample / 8)),  # Byterate
+            int(channels * (bitspersample / 8)),  # Blockalign
             bitspersample,  # 16 bits for two byte samples, etc.
         )
         # Generate data chunk
@@ -60,7 +60,7 @@ class Track:
         datasize = numsamples * channels * (bitspersample / 8)
         data_chunk = struct.pack(
             data_chunk_spec,
-            "data",  # Chunk id
+            b"data",  # Chunk id
             int(datasize),  # Chunk size (excluding chunk id and this field)
         )
         sum_items = [
@@ -76,9 +76,9 @@ class Track:
         main_header_spec = "<4sL4s"
         main_header = struct.pack(
             main_header_spec,
-            "RIFF",
+            b"RIFF",
             all_cunks_size,
-            "WAVE"
+            b"WAVE"
         )
         # Write all the contents in
         file.write(main_header)
@@ -90,7 +90,7 @@ class Track:
     def send_audio_stream(self, filesize, wave_header=None, max_buffer_size=8196):
 
         # Initialize some loop vars
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         bytes_written = 0
         has_frames = True
 
