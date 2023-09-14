@@ -47,7 +47,7 @@ class MainService(threading.Thread):
 
         # get playerid based on mac address
         if self.addon.getSetting("disable_auto_mac") == "true" and self.addon.getSetting("manual_mac"):
-            playerid = self.addon.getSetting("manual_mac").decode("utf-8")
+            playerid = self.addon.getSetting("manual_mac")
         else:
             playerid = get_mac()
 
@@ -139,12 +139,14 @@ class MainService(threading.Thread):
                 self._prev_checksum = self.lmsserver.timestamp
                 log_msg("playlist changed on lms server")
                 self.kodiplayer.update_playlist()
-                self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index)
+                # self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index) # Don't start playing again
             elif not self.kodiplayer.is_playing and self.lmsserver.mode == "play":
                 # playback started
                 log_msg("play started by lms server")
-                if not len(self.kodiplayer.playlist):
-                    self.kodiplayer.update_playlist()
+                self._prev_checksum = self.lmsserver.timestamp # Set Timestemp on start of playing
+                self.kodiplayer.update_playlist() # Update playlist on start of playing
+                # if not len(self.kodiplayer.playlist):
+                #    self.kodiplayer.update_playlist()
                 self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index)
 
             elif self.kodiplayer.is_playing:
@@ -158,6 +160,7 @@ class MainService(threading.Thread):
                     log_msg("Playlist is randomized! Reload to unshuffle....")
                     self.kodiplayer.playlist.unshuffle()
                     self.kodiplayer.update_playlist()
+                    self.kodiplayer.is_playing = False # it seems that xbmc.player calls the OnPlayBackStopped function if the play function is called while already playing.
                     self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index)
                 elif xbmc.getCondVisibility("Player.Paused") and self.lmsserver.mode == "play":
                     # playback resumed
@@ -169,12 +172,15 @@ class MainService(threading.Thread):
                     self.kodiplayer.pause()
                 elif self.kodiplayer.playlist.getposition() != self.lmsserver.cur_index:
                     # other track requested
+                    self.kodiplayer.is_playing = False # it seems that xbmc.player calls the OnPlayBackStopped function if the play function is called while already playing.
                     log_msg("other track requested by lms server")
                     self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index)
-                elif self.lmsserver.status["title"] != xbmc.getInfoLabel("MusicPlayer.Title").decode("utf-8"):
+                elif self.lmsserver.status["title"] != xbmc.getInfoLabel("MusicPlayer.Title"):
                     # monitor if title still matches
                     log_msg("title mismatch - updating playlist...")
                     self.kodiplayer.update_playlist()
+                    log_msg("other track requested by lms server")
+                    self.kodiplayer.is_playing = False # it seems that xbmc.player calls the OnPlayBackStopped function if the play function is called while already playing.
                     self.kodiplayer.play(self.kodiplayer.playlist, startpos=self.lmsserver.cur_index)
                 elif self.lmsserver.mode == "play" and not self.lmsserver.status["current_title"]:
                     # check if seeking is needed - if current_title has value, it means it's a radio stream so we ignore that
@@ -194,7 +200,7 @@ class MainService(threading.Thread):
 
     def start_squeezelite(self):
         '''On supported platforms we include squeezelite binary'''
-        playername = xbmc.getInfoLabel("System.FriendlyName").decode("utf-8")
+        playername = xbmc.getInfoLabel("System.FriendlyName")
         if self.addon.getSetting("disable_auto_squeezelite") != "true":
             sl_binary = get_squeezelite_binary()
             if sl_binary and self.lmsserver:

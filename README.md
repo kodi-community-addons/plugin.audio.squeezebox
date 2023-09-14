@@ -5,27 +5,27 @@ ________________________________________________________________________________
 
 
 Transform Kodi in a Squeezebox player with this addon.
-It started as something for my own personal use but I figured with a few additional touches it can be usefull to others too.
+It started as something for my own personal use but I figured with a few additional touches it can be useful to others too.
 
-Altough Logitech stopped producing the Squeezeboxes several years ago, the platform is still very popular and in active development by the opensource community.
+Although Logitech stopped producing the Squeezeboxes several years ago, the platform is still very popular and in active development by the opensource community.
 
 Sure, systems like Sonos and Heos might be superior in ease of use but they're also (in my opinion) very expensive.
-I wanted to have a way to have multi-room music with an ocassional need of syncing audio between players using my existing components such as Kodi Intel NUC's and raspberry pi's, including support of my Hi-Def audio tracks on disk and my Spotify playlists.
+I wanted to have a way to have multi-room music with an occasional need of syncing audio between players using my existing components such as Kodi Intel NUC's and raspberry pi's, including support of my Hi-Def audio tracks on disk and my Spotify playlists.
 
-The Squeezebox setup with the Logitech Media Server is perfectly capable of doing all that, including support for a wide range of other devices in the mix such as Airplay devices. You can have a combination of original squeezeboxes, pc's with Squeezelite (software player for Squeezebox), Airplay devices and even Chromecast devices and let them all play your favorite tunes. There are even some nice projects available to turn a Raspberry Pi into a squeezebox like PiCoreAudio and Max2Play.
+The Squeezebox setup with the Logitech Media Server is perfectly capable of doing all that, including support for a wide range of other devices in the mix such as Airplay devices. You can have a combination of original squeezeboxes, PCs with Squeezelite (software player for Squeezebox), Airplay devices and even Chromecast devices and let them all play your favorite tunes. There are even some nice projects available to turn a Raspberry Pi into a squeezebox like PiCoreAudio and Max2Play.
 
-For all additional rooms such as kitchen, outside and my office, I use headless Pi's with PiCoreAudio connected to some actve speakers.
+For all additional rooms such as kitchen, outside and my office, I use headless Pi's with PiCoreAudio connected to some active speakers.
 
-Offcourse in the living room and bedroom I have Kodi running as my all-in-one media solution and I didn't want to add another box in there just to play audio.
+Of course in the living room and bedroom I have Kodi running as my all-in-one media solution and I didn't want to add another box in there just to play audio.
 
 That's where Squeezelite comes in play, a nice piece of software that you can install on about any platform to make it play the sounds from the Squeezebox server (Logitech Media Server).
 
-Squeezelite on it's own does it's job very great and you can install it side to side with Kodi on your setup but I was missing the interaction with kodi. Especially the "Now Playing" screen so I can watch some artwork and artist info while track are playing. That's when I decided to create something to fill that gap so I could have the benefits of the centralized audio control of LMS combined with the great Kodi software.
+Squeezelite on it's own does it's job very great and you can install it side to side with Kodi on your setup but I was missing the interaction with Kodi. Especially the "Now Playing" screen so I can watch some artwork and artist info while track are playing. That's when I decided to create something to fill that gap so I could have the benefits of the centralized audio control of LMS combined with the great Kodi software.
 
-I realize there's already an addon for Kodi, named Xsqueeze but it's rather outdated and it's based on custom dialogs which is something I didn't want (personal taste, the Xsqueeze addon is other than that great software offcourse).
+I realize there's already an addon for Kodi, named Xsqueeze but it's rather outdated and it's based on custom dialogs which is something I didn't want (personal taste, the Xsqueeze addon is other than that great software of course).
 
 **So, how does this work ?**
-At first I tried to feed Kodi with the audiostream directly from the Squeezeserver by using the Squeezelite source but I finally gave up on that as I couldn't get it stable enough, especially when sync comes in play. Offcourse doable maybe somewhere in the future but it will require a fair amount of work and tight integration into the Kodi source code.
+At first I tried to feed Kodi with the audiostream directly from the Squeezeserver by using the Squeezelite source but I finally gave up on that as I couldn't get it stable enough, especially when sync comes in play. Of course doable maybe somewhere in the future but it will require a fair amount of work and tight integration into the Kodi source code.
 
 To have something ready sooner I had the idea to just "trick" Kodi that it's playing something and instead use the default, well known and well working Squeezelite software to handle the playback directly to the sound device. 
 
@@ -33,7 +33,7 @@ And that is exactly what this add-on does, it feeds Kodi with a 100% silent PCM 
 
 **Features**
 - Auto start Squeezelite in the background (can be disabled in the addon settings if you start squeezelite yourself, for example on Max2Play devices).
-- Registers as a sqeezeplayer in the LMS server with the MAC address that is reported by Kodi.
+- Registers as a squeezeplayer in the LMS server with the MAC address that is reported by Kodi.
 - Auto detects the LMS server in the network and connects to the first instance it finds.
 - Auto detects the default (ALSA) sound device and use that for audio playback.
 - Plugin entry (audio addon) to browse your media on the LMS server, including apps like Spotify etc.
@@ -51,13 +51,13 @@ And that is exactly what this add-on does, it feeds Kodi with a 100% silent PCM 
 - Make sure the LMS server doesn't require authentication for internal connections. I did not yet implement support for authentication.
 
 I have tested the addon on Windows, MacOS and libreelec running on a Pi.
-Remember, this considered beta software. Altough I spent a fair amount of optimizing it and it works in my scenario, bugs can happen. In that case, or if you have a request to improve it, feel free to let me know on the forums. In case of asking for support when an issue arrises, please include as much info as possible about your setup including the error message in the Kodi log or the entire Kodi logfile itself. Also, Pull requests on Github to optimize the addon are always welcome, feel free to contribute!
+Remember, this considered beta software. Although I spent a fair amount of optimizing it and it works in my scenario, bugs can happen. In that case, or if you have a request to improve it, feel free to let me know on the forums. In case of asking for support when an issue arises, please include as much info as possible about your setup including the error message in the Kodi log or the entire Kodi logfile itself. Also, Pull requests on Github to optimize the addon are always welcome, feel free to contribute!
 
 
 I hope this addon brings some joy to others too, have fun!
 
 
-Was my spare time usefull to you and you can spare a few bucks, consider buying me a beer with a small donation:
+Was my spare time useful to you and you can spare a few bucks, consider buying me a beer with a small donation:
 http://goo.gl/Zsniiz
 Thanks!
 
@@ -65,12 +65,12 @@ Thanks!
 https://github.com/marcelveldt/repository.marcelveldt/raw/master/repository.marcelveldt/repository.marcelveldt-1.0.1.zip
 
 
-**Discussion thread on kodi forums:**
+**Discussion thread on Kodi forums:**
 http://forum.kodi.tv/showthread.php?tid=313912
 
 
 ## Help needed with maintaining !
 I am very busy currently so I do not have a lot of time to work on this project or watch the forums.
-Be aware that this is a community driven project, so feel free to submit PR's yourself to improve the code and/or help others with support on the forums etc. If you're willing to really participate in the development, please contact me so I can give you write access to the repo. I do my best to maintain the project every once in a while, when I have some spare time left.
+Be aware that this is a community driven project, so feel free to submit PR yourself to improve the code and/or help others with support on the forums etc. If you're willing to really participate in the development, please contact me so I can give you write access to the repo. I do my best to maintain the project every once in a while, when I have some spare time left.
 Thanks for understanding!
 

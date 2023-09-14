@@ -11,7 +11,6 @@
 import xbmc
 from utils import log_msg, log_exception, json, process_method_on_list
 import requests
-import thread
 import socket
 import threading
 import re
@@ -183,7 +182,7 @@ class LMSServer:
             if result and result.get("songinfo_loop") and result["songinfo_loop"]:
                 for item in result["songinfo_loop"]:
                     # merge results without overwriting
-                    for key, value in item.iteritems():
+                    for key, value in item.items():
                         if not (lms_song.get(key) or lms_song.get(key) == "0"):
                             lms_song[key] = value
         # correct some other weird stuff
@@ -206,7 +205,7 @@ class LMSServer:
 
     def send_request(self, cmd):
         '''send request to lms server'''
-        if isinstance(cmd, (str, unicode)):
+        if isinstance(cmd, str):
             if "[SP]" in cmd:
                 new_cmd = []
                 for item in cmd.split():
@@ -225,13 +224,13 @@ class LMSServer:
         '''get info from json api'''
         result = {}
         try:
-            response = requests.get(url, data=json.dumps(params), timeout=20)
+            response = requests.post(url, data=json.dumps(params), timeout=20)
             if response and response.content and response.status_code == 200:
                 result = json.loads(response.content.decode('utf-8', 'replace'))
                 if "result" in result:
                     result = result["result"]
             else:
-                log_msg("Invalid or empty reponse from server - command: %s - server response: %s" %
+                log_msg("Invalid or empty response from server - command: %s - server response: %s" %
                         (cmd, response.status_code))
         except Exception:
             log_exception(__name__, "Server is offline or connection error...")

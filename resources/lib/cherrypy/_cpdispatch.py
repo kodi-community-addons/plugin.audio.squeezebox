@@ -205,11 +205,8 @@ try:
 except ImportError:
     test_callable_spec = lambda callable, args, kwargs: None
 else:
-    getargspec = inspect.getargspec
-    # Python 3 requires using getfullargspec if keyword-only arguments are present
-    if hasattr(inspect, 'getfullargspec'):
-        def getargspec(callable):
-            return inspect.getfullargspec(callable)[:4]
+    def getargspec(callable):
+        return inspect.getfullargspec(callable)[:4]
 
 
 class LateParamPageHandler(PageHandler):

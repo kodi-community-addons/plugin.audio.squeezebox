@@ -147,56 +147,21 @@ try:
 except ImportError:
     from cherrypy._cpthreadinglocal import local as threadlocal
 
-try:
-    dict.iteritems
-    # Python 2
-    iteritems = lambda d: d.iteritems()
-    copyitems = lambda d: d.items()
-except AttributeError:
-    # Python 3
-    iteritems = lambda d: d.items()
-    copyitems = lambda d: list(d.items())
+iteritems = lambda d: d.items()
+copyitems = lambda d: list(d.items())
 
-try:
-    dict.iterkeys
-    # Python 2
-    iterkeys = lambda d: d.iterkeys()
-    copykeys = lambda d: d.keys()
-except AttributeError:
-    # Python 3
-    iterkeys = lambda d: d.keys()
-    copykeys = lambda d: list(d.keys())
+iterkeys = lambda d: d.keys()
+copykeys = lambda d: list(d.keys())
 
-try:
-    dict.itervalues
-    # Python 2
-    itervalues = lambda d: d.itervalues()
-    copyvalues = lambda d: d.values()
-except AttributeError:
-    # Python 3
-    itervalues = lambda d: d.values()
-    copyvalues = lambda d: list(d.values())
+itervalues = lambda d: d.values()
+copyvalues = lambda d: list(d.values())
 
-try:
-    # Python 3
-    import builtins
-except ImportError:
-    # Python 2
-    import __builtin__ as builtins
+import builtins
 
-try:
-    # Python 2. We try Python 2 first clients on Python 2
-    # don't try to import the 'http' module from cherrypy.lib
-    from Cookie import SimpleCookie, CookieError
-    from httplib import BadStatusLine, HTTPConnection, IncompleteRead
-    from httplib import NotConnected
-    from BaseHTTPServer import BaseHTTPRequestHandler
-except ImportError:
-    # Python 3
-    from http.cookies import SimpleCookie, CookieError
-    from http.client import BadStatusLine, HTTPConnection, IncompleteRead
-    from http.client import NotConnected
-    from http.server import BaseHTTPRequestHandler
+from http.cookies import SimpleCookie, CookieError
+from http.client import BadStatusLine, HTTPConnection, IncompleteRead
+from http.client import NotConnected
+from http.server import BaseHTTPRequestHandler
 
 # Some platforms don't expose HTTPSConnection, so handle it separately
 if six.PY3:

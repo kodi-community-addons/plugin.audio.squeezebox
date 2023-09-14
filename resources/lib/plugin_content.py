@@ -13,8 +13,8 @@ import xbmcplugin
 import xbmcgui
 import xbmcaddon
 from utils import log_msg, KODI_VERSION, log_exception, ADDON_ID, parse_duration
-import urlparse
-from urllib import quote_plus
+import urllib.parse as urlparse
+from urllib.parse import quote_plus
 import sys
 import os
 from operator import itemgetter
@@ -35,9 +35,9 @@ class PluginContent:
         self.addon = xbmcaddon.Addon(id=ADDON_ID)
 
         # initialize lmsserver object - grab details from window props set by the service
-        lmsplayerid = win.getProperty("lmsplayerid").decode("utf-8")
-        lmshost = win.getProperty("lmshost").decode("utf-8")
-        lmsport = win.getProperty("lmsport").decode("utf-8")
+        lmsplayerid = win.getProperty("lmsplayerid")
+        lmshost = win.getProperty("lmshost")
+        lmsport = win.getProperty("lmsport")
         
         if "select_output" in sys.argv[2]:
             self.select_output()
@@ -50,7 +50,7 @@ class PluginContent:
 
             # initialize plugin listing
             try:
-                self.params = dict(urlparse.parse_qsl(sys.argv[2].replace('?', '').decode("utf-8")))
+                self.params = dict(urlparse.parse_qsl(sys.argv[2].replace('?', '')))
                 log_msg("plugin called with parameters: %s" % self.params, xbmc.LOGDEBUG)
                 self.main()
             except Exception as exc:
@@ -271,7 +271,7 @@ class PluginContent:
                             action = "musicfolder"
                         elif "filesystem" in action:
                             continue  # skip filesystem entry
-                        for key, value in item["actions"]["go"]["params"].iteritems():
+                        for key, value in item["actions"]["go"]["params"].items():
                             if not key in ["mode", "menu"]:
                                 actionstr += "%s:%s " % (key, value.replace("%s", "1").replace(" ", "[SP]"))
                         actionstr += " library_id:%s" % item["id"]
@@ -296,7 +296,7 @@ class PluginContent:
                             else:
                                 actionstr += "%s " % cmd
                         if "params" in item["actions"]["go"]:
-                            for key, value in item["actions"]["go"]["params"].iteritems():
+                            for key, value in item["actions"]["go"]["params"].items():
                                 if not "menu" in key:
                                     actionstr += "%s:%s " % (key, value)
                         actionstr = "browse&params=%s" % quote_plus(actionstr)
@@ -307,7 +307,7 @@ class PluginContent:
                         "icon": icon,
                         "weight": item.get("weight", 0)}
                     menu_items.append(menu_item)
-        return sorted(menu_items, key=itemgetter('weight'))
+        return sorted(menu_items, key=lambda n: int(n.get('weight')))
 
     def menu(self):
         node = self.params.get("node", "home")
@@ -425,7 +425,7 @@ class PluginContent:
                         else:
                             actionstr += "%s " % cmd
                 if action_key in item["actions"] and "params" in item["actions"][action_key]:
-                    for key, value in item["actions"][action_key]["params"].iteritems():
+                    for key, value in item["actions"][action_key]["params"].items():
                         if not "menu" in key:
                             actionstr += "%s:%s " % (key, value)
                 if actionstr:
@@ -566,8 +566,6 @@ class PluginContent:
                              'mediatype': "artist"
                          })
         listitem.setArt({"thumb": thumb})
-        listitem.setIconImage(thumb)
-        listitem.setThumbnailImage(thumb)
         listitem.setProperty("DBYPE", "artist")
         # contextmenu
         contextmenu = []
@@ -593,7 +591,7 @@ class PluginContent:
             # songdetails is really weird formatted in the server response
             for item in track_details["songinfo_loop"]:
                 if isinstance(item, dict):
-                    for key, value in item.iteritems():
+                    for key, value in item.items():
                         result[key] = value
         return result
 
@@ -613,8 +611,6 @@ class PluginContent:
                          })
         listitem.setArt({"thumb": thumb})
         listitem.setProperty("DBYPE", "album")
-        listitem.setIconImage(thumb)
-        listitem.setThumbnailImage(thumb)
         url = "plugin://plugin.audio.squeezebox?action=tracks&params=album_id:%s" % lms_item.get("id")
         # contextmenu
         contextmenu = []
@@ -654,8 +650,6 @@ class PluginContent:
                              "mediatype": "song"
                          })
         listitem.setArt({"thumb": lms_item["thumb"]})
-        listitem.setIconImage(lms_item["thumb"])
-        listitem.setThumbnailImage(lms_item["thumb"])
         listitem.setProperty("isPlayable", "false")
         listitem.setProperty("DBYPE", "song")
         cmd = quote_plus("playlist play %s" % lms_item.get("url"))
@@ -700,7 +694,7 @@ class PluginContent:
                                     url=url, listitem=listitem, isFolder=False)
 
     def create_generic_listitem(self, label, icon, cmd, is_folder=True, contextmenu=None):
-        listitem = xbmcgui.ListItem(label, iconImage=icon)
+        listitem = xbmcgui.ListItem(label)
         url = "plugin://plugin.audio.squeezebox?action=%s" % cmd
         if not contextmenu:
             contextmenu = []

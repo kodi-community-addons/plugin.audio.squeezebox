@@ -33,7 +33,7 @@ while not kodimonitor.waitForAbort(10):
     pass
 
 # stop requested
-log_msg("Abort requested !", xbmc.LOGNOTICE)
+log_msg("Abort requested !", xbmc.LOGINFO)
 main.stop()
 proxy_runner.stop()
-log_msg("Stopped", xbmc.LOGNOTICE)
+log_msg("Stopped", xbmc.LOGINFO)
